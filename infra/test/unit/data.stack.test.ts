@@ -14,17 +14,19 @@ describe("DataStack", () => {
     t.hasResource("AWS::DynamoDB::Table", { DeletionPolicy: "Retain" });
   });
 
-  it("creates a private encrypted S3 bucket", () => {
+  it("creates a private encrypted S3 bucket with RETAIN", () => {
     t.hasResourceProperties("AWS::S3::Bucket", {
       PublicAccessBlockConfiguration: {
         BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true,
       },
     });
+    t.hasResource("AWS::S3::Bucket", { DeletionPolicy: "Retain" });
   });
 
-  it("creates a Cognito user pool and client", () => {
+  it("creates a Cognito user pool and client with RETAIN", () => {
     t.resourceCountIs("AWS::Cognito::UserPool", 1);
     t.resourceCountIs("AWS::Cognito::UserPoolClient", 1);
+    t.hasResource("AWS::Cognito::UserPool", { DeletionPolicy: "Retain" });
   });
 
   it("matches snapshot", () => {

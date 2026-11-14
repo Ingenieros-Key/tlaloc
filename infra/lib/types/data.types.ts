@@ -9,6 +9,7 @@ export type DataConfig = {
   readonly profilesTableName: string;
   readonly mediaBucketName: string;
   readonly userPoolName: string;
+  readonly userPoolClientName: string;
   readonly sesDomain: string;
   readonly sesSender: string;
 };

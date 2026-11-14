@@ -5,6 +5,7 @@ export const dataConfig: DataConfig = {
   profilesTableName: buildName("profiles"),
   mediaBucketName: buildName("media"),
   userPoolName: buildName("users"),
+  userPoolClientName: buildName("users-web"),
   sesDomain: "tlaloc.space",
   sesSender: "info@tlaloc.space",
 };

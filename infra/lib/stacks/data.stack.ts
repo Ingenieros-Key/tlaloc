@@ -55,7 +55,7 @@ export class DataStack extends Stack {
     });
 
     this.userPoolClient = this.userPool.addClient("WebClient", {
-      userPoolClientName: dataConfig.userPoolName + "-web",
+      userPoolClientName: dataConfig.userPoolClientName,
       authFlows: { userSrp: true },
       preventUserExistenceErrors: true,
     });
