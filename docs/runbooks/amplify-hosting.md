@@ -54,5 +54,7 @@ as a separate simple host or be replaced by this Amplify app when ready.)
 ## Notes
 - Per-env branches: connect `dev` and `prod` as separate Amplify branches, each with its own
   `NEXT_PUBLIC_*` env values pointing at that env's Cognito pool + API.
-- Next SSR: Amplify's Next.js runtime handles it; our pages are client-rendered so a static build
-  works too — no extra config needed.
+- Static export: all pages are client-rendered, so `next.config.ts` uses `output: "export"` and the
+  build emits pure static files to `frontend/out` (amplify.yml `baseDirectory: out`). No Next SSR
+  runtime/compute needed — Amplify just serves static assets. If you later add a server-rendered
+  route, drop `output: "export"`, switch `baseDirectory` back to `.next`, and connect as a Next SSR app.
