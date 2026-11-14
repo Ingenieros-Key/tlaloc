@@ -83,6 +83,17 @@ export class DataStack extends Stack {
         requireSymbols: true,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      // ponytail: Cognito sends confirm/reset mail via its default sender until the SES
+      // domain is verified; set SES_READY=true and redeploy to route them from the
+      // configured info@ sender. Avoids a deploy failure when the domain isn't verified yet.
+      email:
+        process.env.SES_READY === "true"
+          ? cognito.UserPoolEmail.withSES({
+              fromEmail: dataConfig.sesSender,
+              fromName: "Tlaloc",
+              sesVerifiedDomain: dataConfig.sesDomain,
+            })
+          : undefined,
       removalPolicy,
     });
 
