@@ -78,7 +78,7 @@ exports[`ServicesStack > matches snapshot 1`] = `
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-us-east-1",
           },
-          "S3Key": "69dfd9a1b6db6ba6554ed9ddce0579d92811acc8678ba4f533ddf2a151459221.zip",
+          "S3Key": "ece93a030c9320f49920b8e608ad3d4cc2f2bf64aa43c54e32eff07afbd60ada.zip",
         },
         "Environment": {
           "Variables": {
