@@ -24,7 +24,6 @@ const nestOptionalExternals = [
   "@nestjs/microservices",
   "@nestjs/platform-socket.io",
   "cache-manager",
-  "class-transformer/storage",
 ];
 
 /** Stateless stack: Nest API Lambda behind API Gateway, Cognito authorizer/triggers, API-key tier. */

@@ -27,7 +27,6 @@ const triggerBundlingExternals = [
   "@nestjs/microservices",
   "@nestjs/platform-socket.io",
   "cache-manager",
-  "class-transformer/storage",
 ];
 
 /** Stateful stack: DynamoDB profiles table, media bucket, Cognito user pool, SES domain identity. */
