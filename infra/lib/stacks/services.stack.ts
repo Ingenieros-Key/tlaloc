@@ -66,6 +66,9 @@ export class ServicesStack extends Stack {
 
     const api = new apigw.RestApi(this, "RestApi", {
       restApiName: buildName("api"),
+      // Account-level CloudWatch Logs role required for the access/execution logging below;
+      // creates the singleton AWS::ApiGateway::Account for this account/region.
+      cloudWatchRole: true,
       deployOptions: {
         tracingEnabled: true,
         stageName: props.baseConfig.env,
