@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tlaloc</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="description" content="Tlaloc — adaptando la agricultura con datos de la NASA. Sitio en construcción." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --noche: #0b1033;
+        --obsidiana: #060818;
+        --anil: #2b3a9e;
+        --jade: #1fc8b4;
+        --jade-profundo: #0a7268;
+        --maiz: #f6b93b;
+        --hueso: #f4f0e6;
+        --piedra: #9aa3c7;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        font-family: "IBM Plex Sans", sans-serif;
+        color: var(--hueso);
+        background:
+          radial-gradient(1200px 600px at 50% -10%, rgba(31, 200, 180, 0.14), transparent 60%),
+          radial-gradient(900px 500px at 85% 110%, rgba(43, 58, 158, 0.35), transparent 60%),
+          var(--noche);
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      .lang {
+        position: absolute;
+        top: 1.25rem;
+        right: 1.25rem;
+        display: inline-flex;
+        border: 1px solid rgba(154, 163, 199, 0.4);
+        border-radius: 999px;
+        overflow: hidden;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.8rem;
+      }
+      .lang button {
+        background: transparent;
+        color: var(--piedra);
+        border: 0;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+        letter-spacing: 0.05em;
+      }
+      .lang button[aria-pressed="true"] {
+        background: var(--jade);
+        color: var(--obsidiana);
+        font-weight: 500;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem 1.5rem 3rem;
+        gap: 1.5rem;
+      }
+      .mark { width: min(220px, 55vw); height: auto; }
+      .tag {
+        font-family: "IBM Plex Mono", monospace;
+        color: var(--jade);
+        font-size: 0.8rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+      h1 {
+        font-family: "Chakra Petch", sans-serif;
+        font-weight: 700;
+        font-size: clamp(2rem, 6vw, 3.5rem);
+        line-height: 1.05;
+      }
+      p.lead {
+        max-width: 40ch;
+        color: var(--piedra);
+        font-size: clamp(1rem, 2.5vw, 1.15rem);
+        line-height: 1.6;
+      }
+      .dot {
+        display: inline-block;
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        background: var(--maiz);
+        box-shadow: 0 0 0 0 rgba(246, 185, 59, 0.6);
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(246, 185, 59, 0.5); }
+        70% { box-shadow: 0 0 0 10px rgba(246, 185, 59, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(246, 185, 59, 0); }
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.85rem;
+        color: var(--hueso);
+      }
+      footer {
+        text-align: center;
+        padding: 1.5rem;
+        color: rgba(154, 163, 199, 0.6);
+        font-size: 0.75rem;
+        font-family: "IBM Plex Mono", monospace;
+      }
+      footer a { color: var(--jade); text-decoration: none; }
+      @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="lang" role="group" aria-label="Language">
+      <button data-lang="es" aria-pressed="true">ES</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+
+    <main>
+      <img class="mark" src="tlaloc-mark.svg" alt="Tlaloc" />
+      <span class="tag" data-es="NASA Space Apps 2026" data-en="NASA Space Apps 2026"></span>
+      <h1 data-es="Sitio en construcción" data-en="Site under construction"></h1>
+      <p
+        class="lead"
+        data-es="Estamos adaptando la agricultura con datos de la NASA. Vuelve pronto."
+        data-en="We're adapting farms with NASA data. Check back soon."
+      ></p>
+      <span class="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span data-es="Construyendo" data-en="Building"></span>
+      </span>
+    </main>
+
+    <footer>
+      tlaloc.space · <a href="mailto:info@tlaloc.space">info@tlaloc.space</a>
+    </footer>
+
+    <script>
+      const buttons = document.querySelectorAll(".lang button");
+      function setLang(lang) {
+        document.documentElement.lang = lang;
+        document.querySelectorAll("[data-" + lang + "]").forEach((el) => {
+          el.textContent = el.getAttribute("data-" + lang);
+        });
+        buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+      }
+      buttons.forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+      setLang("es");
+    </script>
+  </body>
+</html>
