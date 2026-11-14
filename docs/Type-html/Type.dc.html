@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tlaloc typography</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1FC8B4}a:hover{color:#F4F0E6}
+</style>
+</helmet>
+<div style="width: 1200px; height: 640px; box-sizing: border-box; background: #0B1033; color: #F4F0E6; font-family: 'IBM Plex Sans', sans-serif; padding: 48px 56px; display: flex; flex-direction: column; gap: 32px">
+<h1 style="margin: 0; font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 36px; letter-spacing: 0.04em">Type</h1>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 16px; border-top: 2px solid #2B3A9E; padding-top: 20px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #9AA3C7">Display</div><div style="font-family: 'Chakra Petch', sans-serif; font-size: 30px; font-weight: 600; color: #1FC8B4">Chakra Petch</div><div style="font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: 0.14em; line-height: 1">TLALOC</div><div style="font-size: 13px; line-height: 1.45; color: #9AA3C7">Wordmark, headings and big numbers. Chamfered corners echo carved stone. Weights 600 and 700.</div></div>
+<div style="display: flex; flex-direction: column; gap: 16px; border-top: 2px solid #2B3A9E; padding-top: 20px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #9AA3C7">Interface</div><div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 30px; font-weight: 600; color: #1FC8B4">IBM Plex Sans</div><div style="font-size: 18px; line-height: 1.4">Siembra cuando llegue la lluvia, no cuando lo diga el calendario.</div><div style="font-size: 13px; line-height: 1.45; color: #9AA3C7">Body copy, buttons, labels. Full Spanish accents. Weights 400, 500, 600.</div></div>
+<div style="display: flex; flex-direction: column; gap: 16px; border-top: 2px solid #2B3A9E; padding-top: 20px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #9AA3C7">Data</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600; color: #1FC8B4">IBM Plex Mono</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 16px; line-height: 1.5">GPM IMERG · SMAP · MODIS<br>13.69° N  89.19° W</div><div style="font-size: 13px; line-height: 1.45; color: #9AA3C7">Readouts, coordinates, dataset tags, units. Weights 400 and 500.</div></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #2B3A9E; padding-top: 24px"><div style="display: flex; align-items: baseline; gap: 16px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9AA3C7; width: 132px; flex: none">H1 · 40 / 700</div><div style="font-family: 'Chakra Petch', sans-serif; font-weight: 700; letter-spacing: 0.02em; font-size: 40px; line-height: 1.15">Lluvia esta semana</div></div><div style="display: flex; align-items: baseline; gap: 16px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9AA3C7; width: 132px; flex: none">H2 · 26 / 600</div><div style="font-family: 'Chakra Petch', sans-serif; font-weight: 600; font-size: 26px; line-height: 1.15">Humedad del suelo</div></div><div style="display: flex; align-items: baseline; gap: 16px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9AA3C7; width: 132px; flex: none">Body · 16 / 400</div><div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 16px; line-height: 1.15">Texto de lectura para consejos y explicaciones.</div></div><div style="display: flex; align-items: baseline; gap: 16px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9AA3C7; width: 132px; flex: none">Data · 14 / 500</div><div style="font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 14px; line-height: 1.15">13.69° N  89.19° W</div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":640}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
