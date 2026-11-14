@@ -39,12 +39,17 @@ export class DataStack extends Stack {
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
 
+    // dev only — non-prod envs DESTROY (and auto-empty the bucket) so `cdk destroy`
+    // tears the whole stack down for a hackathon; prod keeps RETAIN to prevent data loss.
+    const isProd = props.baseConfig.env === "prod";
+    const removalPolicy = isProd ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
+
     this.profilesTable = new dynamodb.Table(this, "ProfilesTable", {
       tableName: dataConfig.profilesTableName,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy,
     });
 
     this.mediaBucket = new s3.Bucket(this, "MediaBucket", {
@@ -52,7 +57,8 @@ export class DataStack extends Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy,
+      autoDeleteObjects: !isProd,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
@@ -77,7 +83,7 @@ export class DataStack extends Stack {
         requireSymbols: true,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy,
     });
 
     this.userPoolClient = this.userPool.addClient("WebClient", {
