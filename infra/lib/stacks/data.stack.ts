@@ -103,13 +103,24 @@ export class DataStack extends Stack {
       preventUserExistenceErrors: true,
     });
 
-    // ponytail: SES identity created with Easy DKIM; CNAME records are an output
-    // to paste into Namecheap. Flip to Route53 auto-records if DNS ever moves.
-    const domainIdentity = new ses.EmailIdentity(this, "DomainIdentity", {
-      identity: ses.Identity.domain(dataConfig.sesDomain),
+    // The SES domain identity is an account+region-global singleton shared across envs
+    // (same domain). Only the dev stack creates/owns it with Easy DKIM (records pasted into
+    // Namecheap); other envs reference it by its deterministic ARN so their deploys don't
+    // collide on the already-existing identity.
+    // ponytail: dev owns the SES identity — if dev is ever destroyed, re-create the identity
+    // before relying on prod email. Move to a dedicated shared stack if that becomes a problem.
+    const sesIdentityArn = this.formatArn({
+      service: "ses",
+      resource: "identity",
+      resourceName: dataConfig.sesDomain,
     });
+    if (props.baseConfig.env === "dev") {
+      new ses.EmailIdentity(this, "DomainIdentity", {
+        identity: ses.Identity.domain(dataConfig.sesDomain),
+      });
+    }
 
-    this.addCognitoTriggers(domainIdentity);
+    this.addCognitoTriggers(sesIdentityArn);
   }
 
   // ponytail: these trigger lambdas are stateless, but they live in this stateful stack
@@ -118,7 +129,7 @@ export class DataStack extends Stack {
   // the trigger functions, and their invoke permissions are created atomically, so Cognito
   // can validate trigger existence at pool-create time). Splitting them out reintroduces a
   // cross-stack deploy-order failure.
-  private addCognitoTriggers(domainIdentity: ses.EmailIdentity): void {
+  private addCognitoTriggers(sesIdentityArn: string): void {
     const base = (name: string, entry: string) =>
       new nodejs.NodejsFunction(this, name, {
         functionName: buildName(name),
@@ -143,7 +154,7 @@ export class DataStack extends Stack {
     postConfirmation.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["ses:SendEmail"],
-        resources: [domainIdentity.emailIdentityArn],
+        resources: [sesIdentityArn],
       }),
     );
 

@@ -575,10 +575,7 @@ exports[`DataStack > matches snapshot 1`] = `
                     {
                       "Ref": "AWS::AccountId",
                     },
-                    ":identity/",
-                    {
-                      "Ref": "DomainIdentity034B48F5",
-                    },
+                    ":identity/tlaloc.space",
                   ],
                 ],
               },

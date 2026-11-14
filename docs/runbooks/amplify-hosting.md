@@ -1,4 +1,11 @@
-# Host the frontend on AWS Amplify (monorepo, console)
+# Host on AWS Amplify
+
+> **Current state:** Amplify serves the static **under-construction page** (`landing/`) via the
+> root `amplify.yml` (no build). The Next.js app in `frontend/` is kept in the repo for later.
+> When ready to host the real app, replace `amplify.yml` with the frontend build spec below
+> (monorepo `appRoot: frontend`, static export to `out/`) and set the `NEXT_PUBLIC_*` env vars.
+
+## (Later) Host the frontend app on AWS Amplify (monorepo, console)
 
 The frontend is a Next.js app at `frontend/` inside a pnpm workspace. Amplify Hosting supports
 monorepos via an **app root**. A ready build spec lives at repo root: `amplify.yml`
