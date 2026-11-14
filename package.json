@@ -1,0 +1,15 @@
+{
+  "name": "tlaloc",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "infra:synth": "pnpm --filter infra synth",
+    "infra:deploy": "pnpm --filter infra deploy",
+    "backend:dev": "pnpm --filter backend start:dev",
+    "backend:test": "pnpm --filter backend test",
+    "frontend:dev": "pnpm --filter frontend dev"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

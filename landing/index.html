@@ -70,7 +70,16 @@
         padding: 2rem 1.5rem 3rem;
         gap: 1.5rem;
       }
-      .mark { width: min(220px, 55vw); height: auto; }
+      .mark { width: min(200px, 50vw); height: auto; }
+      .wordmark {
+        font-family: "Chakra Petch", sans-serif;
+        font-weight: 700;
+        font-size: clamp(2.5rem, 8vw, 4.5rem);
+        line-height: 1;
+        letter-spacing: 0.02em;
+        color: var(--hueso);
+        margin-top: -0.25rem;
+      }
       .tag {
         font-family: "IBM Plex Mono", monospace;
         color: var(--jade);
@@ -131,6 +140,7 @@
 
     <main>
       <img class="mark" src="tlaloc-mark.svg" alt="Tlaloc" />
+      <p class="wordmark">Tlaloc</p>
       <span class="tag" data-es="NASA Space Apps 2026" data-en="NASA Space Apps 2026"></span>
       <h1 data-es="Sitio en construcción" data-en="Site under construction"></h1>
       <p
