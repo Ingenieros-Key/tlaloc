@@ -6,7 +6,11 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
 
   backend:
     dependencies:
@@ -126,6 +130,9 @@ importers:
       cdk-nag:
         specifier: ^2.38.0
         version: 2.38.2(aws-cdk-lib@2.277.0(constructs@10.8.1))(constructs@10.8.1)
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       tsx:
         specifier: ^4.23.0
         version: 4.23.15

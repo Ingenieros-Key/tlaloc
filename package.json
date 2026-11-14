@@ -8,5 +8,8 @@
     "backend:dev": "pnpm --filter backend start:dev",
     "backend:test": "pnpm --filter backend test",
     "frontend:dev": "pnpm --filter frontend dev"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
