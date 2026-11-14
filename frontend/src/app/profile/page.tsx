@@ -11,8 +11,9 @@ export default function ProfilePage() {
     (async () => {
       try {
         const session = await fetchAuthSession();
-        const token = session.tokens?.idToken?.toString();
-        const res = await fetch(`${apiUrl}profiles/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const token = session.tokens?.idToken?.toString() ?? "";
+        const base = apiUrl.replace(/\/?$/, "/");
+        const res = await fetch(`${base}profiles/me`, { headers: { Authorization: token } });
         if (!res.ok) throw new Error(`API ${res.status}`);
         setProfile(await res.json());
       } catch (err) {
