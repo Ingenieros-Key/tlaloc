@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { configure as serverlessExpress } from '@codegenie/serverless-express';
 import express from 'express';
 import { Handler } from 'aws-lambda';
 import { AppModule } from './app.module.js';
+import { AllExceptionsFilter } from './common/http/http-exception.filter.js';
 
 let cached: Handler;
 
@@ -11,6 +13,8 @@ async function bootstrap(): Promise<Handler> {
   const expressApp = express();
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
   app.enableCors();
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalFilters(new AllExceptionsFilter());
   await app.init();
   return serverlessExpress({ app: expressApp });
 }
