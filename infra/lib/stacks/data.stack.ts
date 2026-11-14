@@ -69,7 +69,13 @@ export class DataStack extends Stack {
       signInAliases: { email: true },
       autoVerify: { email: true },
       standardAttributes: { email: { required: true, mutable: true } },
-      passwordPolicy: { minLength: 8, requireDigits: true, requireLowercase: true, requireUppercase: true },
+      passwordPolicy: {
+        minLength: 8,
+        requireDigits: true,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireSymbols: true,
+      },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: RemovalPolicy.RETAIN,
     });
@@ -82,11 +88,11 @@ export class DataStack extends Stack {
 
     // ponytail: SES identity created with Easy DKIM; CNAME records are an output
     // to paste into Namecheap. Flip to Route53 auto-records if DNS ever moves.
-    new ses.EmailIdentity(this, "DomainIdentity", {
+    const domainIdentity = new ses.EmailIdentity(this, "DomainIdentity", {
       identity: ses.Identity.domain(dataConfig.sesDomain),
     });
 
-    this.addCognitoTriggers();
+    this.addCognitoTriggers(domainIdentity);
   }
 
   // ponytail: these trigger lambdas are stateless, but they live in this stateful stack
@@ -95,7 +101,7 @@ export class DataStack extends Stack {
   // the trigger functions, and their invoke permissions are created atomically, so Cognito
   // can validate trigger existence at pool-create time). Splitting them out reintroduces a
   // cross-stack deploy-order failure.
-  private addCognitoTriggers(): void {
+  private addCognitoTriggers(domainIdentity: ses.EmailIdentity): void {
     const base = (name: string, entry: string) =>
       new nodejs.NodejsFunction(this, name, {
         functionName: buildName(name),
@@ -103,7 +109,11 @@ export class DataStack extends Stack {
         handler: "handler",
         runtime: lambda.Runtime.NODEJS_22_X,
         architecture: lambda.Architecture.ARM_64,
-        logRetention: logs.RetentionDays.TWO_WEEKS,
+        logGroup: new logs.LogGroup(this, `${name}-logs`, {
+          logGroupName: `/aws/lambda/${buildName(name)}`,
+          retention: logs.RetentionDays.TWO_WEEKS,
+          removalPolicy: RemovalPolicy.DESTROY,
+        }),
         tracing: lambda.Tracing.ACTIVE,
         bundling: { minify: true, externalModules: triggerBundlingExternals },
       });
@@ -112,11 +122,11 @@ export class DataStack extends Stack {
     const postConfirmation = base("post-confirmation", "post-confirmation.ts");
 
     // SESv2's SendEmail has no CDK grant method on this grantee; the EmailIdentity's
-    // grantSendEmail isn't reachable here, so scope a PolicyStatement to identity ARNs.
+    // grantSendEmail isn't reachable here, so scope a PolicyStatement to the one identity ARN.
     postConfirmation.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["ses:SendEmail"],
-        resources: [`arn:aws:ses:${this.region}:${this.account}:identity/*`],
+        resources: [domainIdentity.emailIdentityArn],
       }),
     );
 

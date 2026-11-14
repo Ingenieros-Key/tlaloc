@@ -1,4 +1,4 @@
-import { Stack, Duration, CfnOutput } from "aws-cdk-lib";
+import { Stack, Duration, CfnOutput, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import {
   aws_lambda as lambda,
@@ -31,8 +31,6 @@ export class ServicesStack extends Stack {
   constructor(scope: Construct, id: string, props: ServicesStackProps) {
     super(scope, id, props);
 
-    const logRetention = servicesConfig.logRetentionDays as logs.RetentionDays;
-
     const apiFn = new nodejs.NodejsFunction(this, "ApiFn", {
       functionName: buildName("api"),
       entry: path.join(handlerDir, "lambda.ts"),
@@ -42,7 +40,11 @@ export class ServicesStack extends Stack {
       memorySize: servicesConfig.lambdaMemoryMb,
       timeout: Duration.seconds(servicesConfig.lambdaTimeoutSec),
       tracing: lambda.Tracing.ACTIVE,
-      logRetention,
+      logGroup: new logs.LogGroup(this, "ApiFn-logs", {
+        logGroupName: `/aws/lambda/${buildName("api")}`,
+        retention: servicesConfig.logRetentionDays as logs.RetentionDays,
+        removalPolicy: RemovalPolicy.DESTROY,
+      }),
       bundling: { minify: true, sourceMap: true, externalModules: nestOptionalExternals },
       environment: {
         PROFILES_TABLE: props.profilesTable.tableName,
@@ -56,9 +58,22 @@ export class ServicesStack extends Stack {
     props.profilesTable.grantReadWriteData(apiFn);
     props.mediaBucket.grantReadWrite(apiFn);
 
+    const accessLogGroup = new logs.LogGroup(this, "ApiAccessLogs", {
+      logGroupName: `/aws/apigateway/${buildName("api")}-access`,
+      retention: servicesConfig.logRetentionDays as logs.RetentionDays,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
     const api = new apigw.RestApi(this, "RestApi", {
       restApiName: buildName("api"),
-      deployOptions: { tracingEnabled: true, stageName: props.baseConfig.env },
+      deployOptions: {
+        tracingEnabled: true,
+        stageName: props.baseConfig.env,
+        loggingLevel: apigw.MethodLoggingLevel.INFO,
+        metricsEnabled: true,
+        accessLogDestination: new apigw.LogGroupLogDestination(accessLogGroup),
+        accessLogFormat: apigw.AccessLogFormat.jsonWithStandardFields(),
+      },
       defaultCorsPreflightOptions: {
         allowOrigins: apigw.Cors.ALL_ORIGINS,
         allowMethods: apigw.Cors.ALL_METHODS,

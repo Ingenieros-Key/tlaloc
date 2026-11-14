@@ -16,85 +16,6 @@ exports[`DataStack > matches snapshot 1`] = `
       },
       "Type": "AWS::SES::EmailIdentity",
     },
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
-      "DependsOn": [
-        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
-        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-      ],
-      "Properties": {
-        "Code": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-us-east-1",
-          },
-          "S3Key": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip",
-        },
-        "Handler": "index.handler",
-        "Role": {
-          "Fn::GetAtt": [
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-            "Arn",
-          ],
-        },
-        "Runtime": "nodejs24.x",
-        "Timeout": 900,
-      },
-      "Type": "AWS::Lambda::Function",
-    },
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                {
-                  "Ref": "AWS::Partition",
-                },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-              ],
-            ],
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "logs:PutRetentionPolicy",
-                "logs:DeleteRetentionPolicy",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
-        "Roles": [
-          {
-            "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
     "MediaBucketBCBB02BA": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -244,6 +165,7 @@ exports[`DataStack > matches snapshot 1`] = `
             "MinimumLength": 8,
             "RequireLowercase": true,
             "RequireNumbers": true,
+            "RequireSymbols": true,
             "RequireUppercase": true,
           },
         },
@@ -356,6 +278,11 @@ exports[`DataStack > matches snapshot 1`] = `
         },
         "FunctionName": "tlaloc-dev-custom-message",
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "custommessagelogsB327887A",
+          },
+        },
         "Role": {
           "Fn::GetAtt": [
             "custommessageServiceRole26AB4E97",
@@ -368,29 +295,6 @@ exports[`DataStack > matches snapshot 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
-    },
-    "custommessageLogRetention7D6FD8E3": {
-      "Properties": {
-        "LogGroupName": {
-          "Fn::Join": [
-            "",
-            [
-              "/aws/lambda/",
-              {
-                "Ref": "custommessage06E8DB26",
-              },
-            ],
-          ],
-        },
-        "RetentionInDays": 14,
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "Custom::LogRetention",
     },
     "custommessageServiceRole26AB4E97": {
       "Properties": {
@@ -447,6 +351,15 @@ exports[`DataStack > matches snapshot 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "custommessagelogsB327887A": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/tlaloc-dev-custom-message",
+        "RetentionInDays": 14,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
+    },
     "postconfirmationF2D569AD": {
       "DependsOn": [
         "postconfirmationServiceRoleDefaultPolicy420D3A85",
@@ -464,6 +377,11 @@ exports[`DataStack > matches snapshot 1`] = `
         },
         "FunctionName": "tlaloc-dev-post-confirmation",
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "postconfirmationlogs31B655C3",
+          },
+        },
         "Role": {
           "Fn::GetAtt": [
             "postconfirmationServiceRole1348F280",
@@ -476,29 +394,6 @@ exports[`DataStack > matches snapshot 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
-    },
-    "postconfirmationLogRetention67D3D944": {
-      "Properties": {
-        "LogGroupName": {
-          "Fn::Join": [
-            "",
-            [
-              "/aws/lambda/",
-              {
-                "Ref": "postconfirmationF2D569AD",
-              },
-            ],
-          ],
-        },
-        "RetentionInDays": 14,
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "Custom::LogRetention",
     },
     "postconfirmationServiceRole1348F280": {
       "Properties": {
@@ -550,11 +445,18 @@ exports[`DataStack > matches snapshot 1`] = `
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:ses:us-east-1:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":ses:us-east-1:",
                     {
                       "Ref": "AWS::AccountId",
                     },
-                    ":identity/*",
+                    ":identity/",
+                    {
+                      "Ref": "DomainIdentity034B48F5",
+                    },
                   ],
                 ],
               },
@@ -570,6 +472,15 @@ exports[`DataStack > matches snapshot 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "postconfirmationlogs31B655C3": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/tlaloc-dev-post-confirmation",
+        "RetentionInDays": 14,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete",
     },
   },
   "Rules": {
