@@ -21,11 +21,16 @@ export const inspector = {
   nasaSource: "NASA",
   /** Where each factor's value comes from, on its NASA badge. */
   sourceHints: {
-    rain: "NASA POWER: total rainfall over the last 12 months at this plot",
-    temp: "NASA POWER: mean air temperature over the last 12 months at this plot",
-    humidity: "NASA POWER: mean relative humidity over the last 12 months at this plot",
-    elevation: "NASA SRTM: mean height of the hexagons this plot covers",
-  } satisfies Record<FactorId, string>,
+    rain: (years: string) => `NASA POWER: average annual rainfall at this plot, ${years}`,
+    temp: (years: string) => `NASA POWER: average air temperature at this plot, ${years}`,
+    humidity: (years: string) => `NASA POWER: average relative humidity at this plot, ${years}`,
+    elevation: () => "NASA SRTM: mean height of the hexagons this plot covers",
+  } satisfies Record<FactorId, (years: string) => string>,
+  /** The crop scored on each year behind the average. */
+  byYear: "Each year",
+  byYearLabel: (crop: string) => `${crop} score in each of the last years`,
+  yearScore: (year: number, score: number, rating: string) => `${year}: ${score} of 100, ${rating}`,
+  yearRange: (first: number, last: number) => (first === last ? `${first}` : `${first}–${last}`),
   outlookHeading: "Planting outlook",
   loadingOutlook: "Analyzing plot",
   outside: "This plot is outside the data coverage. Draw inside El Salvador's outline.",

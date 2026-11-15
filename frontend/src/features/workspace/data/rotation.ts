@@ -340,17 +340,3 @@ export function planMetrics(steps: readonly RotationStep[]): PlanMetrics {
     fit: fits.length > 0 ? Math.round(mean(fits)) : null,
   };
 }
-
-/** Rainfall per calendar month (index 0 = January) from a daily series keyed YYYYMMDD. */
-export function monthlyTotals(series: Readonly<Record<string, number | null>> | undefined): number[] | null {
-  const months = new Array<number>(12).fill(0);
-  let days = 0;
-  for (const [date, value] of Object.entries(series ?? {})) {
-    if (value === null) continue;
-    const month = Number(date.slice(4, 6)) - 1;
-    if (month < 0 || month > 11) continue;
-    months[month] += value;
-    days += 1;
-  }
-  return days > 0 ? months : null;
-}

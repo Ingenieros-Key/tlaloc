@@ -3,10 +3,9 @@
 import { Check } from "lucide-react";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { CROP_ORDER } from "../data/crops";
-import { seasonOfSowing, type HarvestResult, type LastCrop, type Planting, type StubbleUse } from "../data/rotation";
+import { seasonOfSowing, type LastCrop, type Planting } from "../data/rotation";
 import { useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
-import type { CropId } from "../types";
 import { CropSwatch } from "../ui/CropSwatch";
 import { Segmented } from "../ui/Segmented";
 
@@ -22,8 +21,8 @@ const FIELD =
 type YesNo = "yes" | "no";
 
 /**
- * "Last planting": where the farmer is in their cycle. Three answers are required (crop, sowing
- * month and year, harvested or not); the rest is optional. Sugarcane is dated by the years it has
+ * "Last planting": where the farmer is in their cycle: the crop, its sowing month and year, and
+ * whether it is harvested. Sugarcane is dated by the years it has
  * stood and asks whether the field is being renewed, since the sheet's rules wait for that.
  * "Something else, or nothing" needs no further answers.
  */
@@ -42,15 +41,11 @@ export function PlantingForm({
   const [month, setMonth] = useState<number | null>(initial?.sowMonth ?? null);
   const [year, setYear] = useState<number>(initial?.sowYear ?? thisYear);
   const [harvested, setHarvested] = useState<YesNo | "">(initial && initial.crop !== "other" ? (initial.harvested ? "yes" : "no") : "");
-  const [harvest, setHarvest] = useState<HarvestResult | "">(initial?.harvest ?? "");
-  const [stubble, setStubble] = useState<StubbleUse | "">(initial?.stubble ?? "");
-  const [earlier, setEarlier] = useState<CropId | "">(initial?.earlier ?? "");
   const [caneYears, setCaneYears] = useState<number>(initial?.caneYears ?? 1);
   const [renewing, setRenewing] = useState<YesNo | "">(initial?.crop === "sugarcane" ? (initial.renewing ? "yes" : "no") : "");
   const [tried, setTried] = useState(false);
   const monthId = useId();
   const yearId = useId();
-  const earlierId = useId();
   const caneId = useId();
   const errorId = useId();
 
@@ -76,9 +71,10 @@ export function PlantingForm({
         sowMonth: dated ? month : null,
         sowYear: dated ? year : null,
         harvested: dated ? harvested === "yes" : true,
-        harvest: other || harvest === "" ? null : harvest,
-        stubble: other || stubble === "" ? null : stubble,
-        earlier: other || earlier === "" ? null : earlier,
+        // No longer asked; an edited planting keeps what it already had.
+        harvest: other ? null : (initial?.harvest ?? null),
+        stubble: other ? null : (initial?.stubble ?? null),
+        earlier: other ? null : (initial?.earlier ?? null),
         caneYears: cane ? caneYears : null,
         renewing: cane && renewing === "yes",
       },
@@ -196,51 +192,6 @@ export function PlantingForm({
               onChange={setRenewing}
             />
             {tried && errors.renewing ? <FieldError>{s.errors.renewing}</FieldError> : null}
-          </div>
-        </>
-      ) : null}
-
-      {crop !== null && !other ? (
-        <>
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
-            <span>{s.optional}</span>
-            <span aria-hidden="true" className="h-px flex-1 bg-line" />
-          </div>
-          <div>
-            <p className="mb-1.5 font-semibold">{s.harvest}</p>
-            <Segmented<HarvestResult>
-              label={s.harvest}
-              value={harvest}
-              options={(["good", "regular", "poor"] as const).map((value) => ({ value, label: s.harvestOptions[value] }))}
-              onChange={setHarvest}
-            />
-          </div>
-          <div>
-            <p className="mb-1.5 font-semibold">{s.stubble}</p>
-            <Segmented<StubbleUse>
-              label={s.stubble}
-              value={stubble}
-              options={(["left", "removed", "burned"] as const).map((value) => ({ value, label: s.stubbleOptions[value] }))}
-              onChange={setStubble}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={earlierId} className="font-semibold">
-              {s.earlier}
-            </label>
-            <select
-              id={earlierId}
-              value={earlier}
-              onChange={(e) => setEarlier(e.target.value as CropId | "")}
-              className={FIELD}
-            >
-              <option value="">{s.earlierNone}</option>
-              {CROP_ORDER.map((id) => (
-                <option key={id} value={id}>
-                  {t.common.crops[id]}
-                </option>
-              ))}
-            </select>
           </div>
         </>
       ) : null}

@@ -130,7 +130,14 @@ export type CropAssessment = {
   readonly factors: readonly FactorScore[];
   /** The factor with the lowest score (null when every factor is within its ideal band). */
   readonly limiting: FactorId | null;
+  /**
+   * The same crop scored on each year behind the average, oldest first (plot outlook only), to show
+   * how steady the fit is. Years missing a value are left out.
+   */
+  readonly years?: readonly YearScore[];
 };
+
+export type YearScore = { readonly year: number; readonly score: number; readonly rating: Rating };
 
 export type Assessment =
   | { readonly kind: "ok"; readonly cellsSampled: number; readonly crops: readonly CropAssessment[] }

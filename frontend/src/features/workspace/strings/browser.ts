@@ -27,7 +27,7 @@ export const browser = {
       compare: "Two layers side by side. Drag the divider on the map.",
       blend: "Two layers as one color: every cell is low, mid or high on each.",
       columns: "One layer as height, another as color, on a tilted map.",
-      score: "How well a crop fits each place, from the last 12 months.",
+      score: "How well a crop fits each place, from the last 5 years of climate.",
     },
     /** What the active and the second layer do in each two-layer view. */
     roles: {
@@ -42,11 +42,11 @@ export const browser = {
     blendLabel: (first: string, second: string) => `Colors for low, mid and high ${first} and ${second}`,
     height: (layer: string, min: string, max: string) => `Height · ${layer}, ${min} to ${max}`,
     crop: "Crop",
-    scoreLoading: "Loading 12 months of NASA POWER data…",
+    scoreLoading: "Loading 5 years of NASA POWER data…",
     scoreLegend: "Outlook score",
     scoreEnds: { poor: "Poor · under 45", fair: "Fair", good: "Good · 70+" },
     scoreNote:
-      "Every cell is scored like a plot's outlook, with the crop viability model: NASA POWER temperature, rainfall and humidity over the last 12 months, and NASA SRTM elevation.",
+      "Every cell is scored like a plot's outlook, with the crop viability model: NASA POWER temperature, rainfall and humidity averaged over the last 5 complete years, and NASA SRTM elevation.",
   },
   showLayer: (layer: string) => `Show ${layer}`,
   /** Screen-reader note on a layer row: expanding it also changes what the map shows. */

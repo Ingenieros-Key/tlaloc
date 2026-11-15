@@ -58,7 +58,7 @@ const SETTLED_AFTER_DAYS = 60;
 export const PRECIP_DEFAULT_POINT: readonly [number, number] = [-89.2182, 13.6929];
 
 /** Covers El Salvador with a margin. POWER regional queries need at least 2° on each axis. */
-const EL_SALVADOR_BBOX = { west: -90.25, south: 12.75, east: -87.5, north: 14.75 } as const;
+export const EL_SALVADOR_BBOX = { west: -90.25, south: 12.75, east: -87.5, north: 14.75 } as const;
 
 type LngLat = readonly [number, number];
 
@@ -175,27 +175,13 @@ export function pointQuery([lng, lat]: LngLat, window: PrecipWindow, parameters:
 }
 
 /**
- * Each hexagon's value over a whole window, from a regional POWER answer: the layer's mean, or for
- * rainfall its total scaled to `fullDays` (so days not published yet do not lower a yearly total).
- * Aggregated at POWER's grid points first, then interpolated like the daily frames. NaN = no data.
+ * One value per POWER grid point (null = no data) interpolated onto the hexagon grid, bilinearly
+ * like the daily frames. NaN where no surrounding point has a value.
  */
-export function buildLayerAggregate(
+export function interpolateToGrid(
   data: readonly PowerLocation[],
-  layer: PowerLayerId,
-  fullDays: number,
+  pointValues: readonly (number | null)[],
 ): Float32Array {
-  const { parameter, aggregate, scale } = LAYER_SOURCES[layer];
-  const points = data.map((location) => {
-    let sum = 0;
-    let days = 0;
-    for (const value of Object.values(location.series[parameter] ?? {})) {
-      if (value === null) continue;
-      sum += value;
-      days += 1;
-    }
-    if (days === 0) return null;
-    return (aggregate === "sum" ? (sum * fullDays) / days : sum / days) * scale;
-  });
   const grid = getSampleGrid();
   const weights = bilinearWeights(
     data.map((location): LngLat => [location.longitude, location.latitude]),
@@ -206,8 +192,8 @@ export function buildLayerAggregate(
     let sum = 0;
     let total = 0;
     for (const [point, w] of hexWeights) {
-      const value = points[point];
-      if (value === null) continue;
+      const value = pointValues[point];
+      if (value === null || value === undefined) continue;
       sum += value * w;
       total += w;
     }

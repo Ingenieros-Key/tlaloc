@@ -2,6 +2,8 @@ export {
   PowerError,
   fetchDailyPoint,
   fetchDailyRegional,
+  fetchMonthlyPoint,
+  fetchMonthlyRegional,
   yearRange,
   type DailySeries,
   type ParameterInfo,
@@ -12,7 +14,13 @@ export {
   type PowerResult,
   type RegionalQuery,
 } from "./client";
-export { POWER_QUERY_ROOT, powerPointQuery, powerRegionalQuery } from "./queries";
+export {
+  POWER_QUERY_ROOT,
+  powerMonthlyPointQuery,
+  powerMonthlyRegionalQuery,
+  powerPointQuery,
+  powerRegionalQuery,
+} from "./queries";
 export {
   addDays,
   dateRange,

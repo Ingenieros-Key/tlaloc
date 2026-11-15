@@ -16,7 +16,7 @@ export const SAMPLE_LAYER_ORDER: readonly SampleLayerId[] = ["humidity", "rain",
 /** Layers listed in the Browser and drawable on the map, in Browser order. */
 export const LAYER_ORDER: readonly LayerId[] = ["precip", "temp", "humidity", "moisture", "elevation"];
 
-/** Crop outlook factors, in the order its cards list them: by weight in the viability model. */
+/** Crop outlook factors, in the order its cards list them (the same for every crop). */
 export const FACTOR_ORDER: readonly FactorId[] = ["rain", "temp", "humidity", "elevation"];
 
 /** Layers whose values come from a live source instead of the sample grid (all Browser layers). */
@@ -145,8 +145,8 @@ export const MUTED_CELL: Rgba = [158, 176, 204, 28];
 /** A value scale: what `rampColor` and `rampGradient` need of a layer. */
 export type ColorScale = Pick<LayerDef, "domain" | "ramp">;
 
-/** View modes, in the order the Browser lists them. */
-export const VIEW_MODES: readonly ViewMode[] = ["single", "compare", "blend", "columns", "score"];
+/** View modes, in the order the tool rail lists them: the Crop score first. */
+export const VIEW_MODES: readonly ViewMode[] = ["score", "single", "compare", "blend", "columns"];
 
 /** Modes that draw the active layer together with a second one. */
 export function isTwoLayerMode(mode: ViewMode): boolean {
