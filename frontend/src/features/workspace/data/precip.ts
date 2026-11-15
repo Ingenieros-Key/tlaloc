@@ -8,7 +8,7 @@ import {
   type PowerDate,
   type PowerLocation,
 } from "@/lib/nasa-power";
-import type { FieldCell, LayerId } from "../types";
+import type { FieldCell, LayerId, PowerLayerId } from "../types";
 import { getSampleGrid } from "./sample-grid";
 
 /** NASA POWER corrected precipitation, mm per day. */
@@ -27,7 +27,7 @@ export const MOISTURE_PARAMETER = "GWETROOT";
  * wetness 0–1 is shown as a percentage).
  */
 export const LAYER_SOURCES: Readonly<
-  Record<LayerId, { readonly parameter: string; readonly aggregate: "sum" | "mean"; readonly scale: number }>
+  Record<PowerLayerId, { readonly parameter: string; readonly aggregate: "sum" | "mean"; readonly scale: number }>
 > = {
   precip: { parameter: PRECIP_PARAMETER, aggregate: "sum", scale: 1 },
   temp: { parameter: TEMP_PARAMETER, aggregate: "mean", scale: 1 },
@@ -86,9 +86,12 @@ export function windowDays({ start, end }: PrecipWindow): number {
   return Math.round((parsePowerDate(end).getTime() - parsePowerDate(start).getTime()) / 86_400_000) + 1;
 }
 
-/** Daily precipitation on the workspace hexagon grid. */
+/**
+ * A layer's values on the workspace hexagon grid: one frame per day, or for elevation a single
+ * static frame with no dates (which is what hides the timeline).
+ */
 export type PrecipFrames = {
-  /** One per frame, oldest first. The last is the newest day with data. */
+  /** One per frame, oldest first. The last is the newest day with data. Empty for elevation. */
   readonly dates: readonly PowerDate[];
   /** Hexagon outlines shared by every frame (3.5 km cells clipped to El Salvador). */
   readonly hexes: readonly FieldCell[];
@@ -112,7 +115,7 @@ export function heightDomain(
   domain: readonly [number, number],
   frames: PrecipFrames | null,
 ): readonly [number, number] {
-  if (LAYER_SOURCES[layer].aggregate !== "sum" || !frames) return domain;
+  if (layer === "elevation" || LAYER_SOURCES[layer].aggregate !== "sum" || !frames) return domain;
   const cached = heightDomains.get(frames);
   if (cached) return cached;
   let max = MIN_RAIN_HEIGHT_MM;
@@ -159,7 +162,7 @@ function bilinearWeights(grid: readonly LngLat[], targets: readonly LngLat[]): r
 }
 
 /** POWER regional request behind a map layer: every grid cell over El Salvador for the window. */
-export function layerRegionalQuery(layer: LayerId, window: PrecipWindow) {
+export function layerRegionalQuery(layer: PowerLayerId, window: PrecipWindow) {
   const parameter = LAYER_SOURCES[layer].parameter;
   const options = powerRegionalQuery({ parameters: [parameter], bbox: EL_SALVADOR_BBOX, ...window });
   const settled = window.end < addDays(toPowerDate(new Date()), -SETTLED_AFTER_DAYS);
@@ -178,7 +181,7 @@ export function pointQuery([lng, lat]: LngLat, window: PrecipWindow, parameters:
  */
 export function buildLayerAggregate(
   data: readonly PowerLocation[],
-  layer: LayerId,
+  layer: PowerLayerId,
   fullDays: number,
 ): Float32Array {
   const { parameter, aggregate, scale } = LAYER_SOURCES[layer];
@@ -220,7 +223,7 @@ export function buildLayerAggregate(
  * detailed than the source. Trailing days nobody has published yet (a lag longer than assumed) are
  * dropped.
  */
-export function buildLayerFrames(data: readonly PowerLocation[], layer: LayerId): PrecipFrames {
+export function buildLayerFrames(data: readonly PowerLocation[], layer: PowerLayerId): PrecipFrames {
   const { parameter, scale } = LAYER_SOURCES[layer];
   const series = data.map((location) => location.series[parameter] ?? {});
   // POWER answers with every day of the request (fill values included), so its keys are the dates.

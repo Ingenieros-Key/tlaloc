@@ -31,7 +31,7 @@ const CloseIcon = () => (
   </svg>
 );
 
-function BrandPanel({ tagline }: { tagline: string }) {
+function BrandPanel() {
   return (
     <div className="relative hidden w-2/5 shrink-0 overflow-hidden bg-[#0B1033] md:block">
       <img
@@ -40,10 +40,6 @@ function BrandPanel({ tagline }: { tagline: string }) {
         aria-hidden
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0B1033] via-[#0B1033]/40 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 z-10 p-8 text-center">
-        <p className="text-sm font-medium text-[#F4F0E6]/90">{tagline}</p>
-      </div>
     </div>
   );
 }
@@ -139,7 +135,7 @@ export function AuthModal({
             exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 10 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
           >
-            <BrandPanel tagline={t.tagline} />
+            <BrandPanel />
 
             <div className="relative flex-1 overflow-y-auto p-7">
               <button

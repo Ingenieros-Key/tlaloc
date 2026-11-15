@@ -46,7 +46,7 @@ export const browser = {
     scoreLegend: "Outlook score",
     scoreEnds: { poor: "Poor · under 45", fair: "Fair", good: "Good · 70+" },
     scoreNote:
-      "Every cell is scored like a plot's outlook: NASA POWER temperature, humidity and rainfall over the last 12 months. Soil condition is simulated.",
+      "Every cell is scored like a plot's outlook, with the crop viability model: NASA POWER temperature, rainfall and humidity over the last 12 months, and NASA SRTM elevation.",
   },
   showLayer: (layer: string) => `Show ${layer}`,
   /** Screen-reader note on a layer row: expanding it also changes what the map shows. */
@@ -66,6 +66,10 @@ export const browser = {
   rangeReadout: (min: string, max: string, unit: string) => `${min} – ${max} ${unit}`,
   reset: "Reset",
   resetLayer: (layer: string) => `Reset ${layer} opacity and range`,
+  /** Elevation: NASA SRTM heights from the AWS Terrain Tiles; static, so it has no timeline. */
+  elevationBadgeHint: "NASA SRTM elevation, via the AWS Terrain Tiles",
+  elevationLoading: "Loading elevation…",
+  elevationError: "Couldn't load elevation.",
   /** Live NASA POWER layers (precipitation, temperature, humidity, soil moisture) and their timeline. */
   precip: {
     badge: "NASA",

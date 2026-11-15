@@ -1,17 +1,32 @@
-import type { AnyLayerId, FactorId, LayerDef, LayerId, LayerSettings, Rgba, SampleLayerId, ViewMode } from "./types";
+import type {
+  AnyLayerId,
+  FactorId,
+  LayerDef,
+  LayerId,
+  LayerSettings,
+  PowerLayerId,
+  Rgba,
+  SampleLayerId,
+  ViewMode,
+} from "./types";
 
 /** Sample-grid layers, in the order the crop assessment lists its factors. */
 export const SAMPLE_LAYER_ORDER: readonly SampleLayerId[] = ["humidity", "rain", "soil"];
 
 /** Layers listed in the Browser and drawable on the map, in Browser order. */
-export const LAYER_ORDER: readonly LayerId[] = ["precip", "temp", "humidity", "moisture"];
+export const LAYER_ORDER: readonly LayerId[] = ["precip", "temp", "humidity", "moisture", "elevation"];
 
-/** Crop outlook factors, in the order its cards list them. */
-export const FACTOR_ORDER: readonly FactorId[] = ["temp", "humidity", "rain", "soil"];
+/** Crop outlook factors, in the order its cards list them: by weight in the viability model. */
+export const FACTOR_ORDER: readonly FactorId[] = ["rain", "temp", "humidity", "elevation"];
 
-/** Layers whose values come from a live API instead of the sample grid (all Browser layers). */
+/** Layers whose values come from a live source instead of the sample grid (all Browser layers). */
 export function isLiveLayer(id: AnyLayerId): id is LayerId {
   return (LAYER_ORDER as readonly string[]).includes(id);
+}
+
+/** The daily NASA POWER layers: every Browser layer except elevation, which has no days. */
+export function isPowerLayer(id: AnyLayerId): id is PowerLayerId {
+  return isLiveLayer(id) && id !== "elevation";
 }
 
 /**
@@ -87,6 +102,22 @@ export const LAYERS: Readonly<Record<AnyLayerId, LayerDef>> = {
       [96, 64, 204, 255],
     ],
   },
+  // NASA SRTM via the AWS Terrain Tiles, metres above sea level, averaged per hexagon (peaks near
+  // 2,700 m smooth out below 2,000 m). Green coast → tan → brown → pale summits, the usual
+  // hypsometric order, kept apart from temperature's yellow-red and soil moisture's brown-teal.
+  elevation: {
+    id: "elevation",
+    domain: [0, 2000],
+    unit: "m",
+    precision: 0,
+    ramp: [
+      [38, 115, 77, 200],
+      [150, 180, 95, 215],
+      [215, 190, 120, 230],
+      [160, 105, 70, 245],
+      [245, 240, 232, 255],
+    ],
+  },
   soil: {
     id: "soil",
     domain: [0, 100],
@@ -126,13 +157,15 @@ export function isTwoLayerMode(mode: ViewMode): boolean {
  * Where each layer's values turn from low to mid and from mid to high in the Blend view. Fixed, so
  * a class means the same thing every day: under 1 mm is a dry day and over 10 mm a wet one; the
  * highlands sit under 22 °C and the coast over 28 °C; dry-season air is under 60 % and rainy-season
- * air over 80 %; soil under 40 % is dry and over 70 % wet.
+ * air over 80 %; soil under 40 % is dry and over 70 % wet; under 300 m is the coastal plain and
+ * over 1,000 m the highlands.
  */
 export const LAYER_BREAKS: Readonly<Record<LayerId, readonly [number, number]>> = {
   precip: [1, 10],
   temp: [22, 28],
   humidity: [60, 80],
   moisture: [40, 70],
+  elevation: [300, 1000],
 };
 
 /** 0 = low, 1 = mid, 2 = high, by the layer's Blend breaks. */

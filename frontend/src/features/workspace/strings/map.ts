@@ -33,6 +33,7 @@ export const map = {
   tooltip: {
     outsideRange: "Outside filter range",
     powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,
+    elevationSource: "NASA SRTM · mean per hexagon",
   },
   compare: {
     divider: (left: string, right: string) => `Divider between ${left} (left) and ${right} (right)`,
@@ -45,6 +46,6 @@ export const map = {
     outOf100: "/100",
     limitedBy: (factor: string) => `Held back by ${factor.toLowerCase()}`,
     allWithin: "Every factor is in its ideal range",
-    source: "NASA POWER, last 12 months. Soil condition is simulated.",
+    source: "Crop viability model: NASA POWER, last 12 months, and NASA SRTM elevation.",
   },
 } as const;

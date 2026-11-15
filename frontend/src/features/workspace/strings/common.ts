@@ -4,15 +4,16 @@ import type { AnyLayerId, CropId, LayerId, Rating } from "../types";
 export const common = {
   appName: "Tlaloc",
   sampleData: "Sample data",
-  sampleDataHint:
-    "Temperature, humidity and rainfall in the crop outlook are NASA POWER data: the last 12 months at your plot (marked NASA). Soil condition is still simulated for demonstration.",
-  partlySample: "Partly sample",
+  modelNotice: "Exploratory",
+  modelNoticeHint:
+    "Scores come from the crop viability model: NASA POWER temperature, rainfall and humidity over the last 12 months, and NASA SRTM elevation. Temperature and rainfall ranges follow FAO ECOCROP; elevation and humidity ranges are partly exploratory. Not yet validated for El Salvador.",
   layers: {
     humidity: "Humidity",
     rain: "Rainfall",
     precip: "Precipitation",
     temp: "Temperature",
     moisture: "Soil moisture",
+    elevation: "Elevation",
     soil: "Soil condition",
   } satisfies Record<AnyLayerId, string>,
   layerDescriptions: {
@@ -20,6 +21,7 @@ export const common = {
     temp: "Daily mean air temperature",
     humidity: "Daily relative humidity",
     moisture: "Root-zone soil wetness",
+    elevation: "Height above sea level",
   } satisfies Record<LayerId, string>,
   crops: {
     corn: "Corn",

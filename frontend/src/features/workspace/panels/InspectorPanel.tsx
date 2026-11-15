@@ -1,9 +1,9 @@
 "use client";
 
-import { MapPinOff } from "lucide-react";
+import { MapPinOff, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { usePanelCollapse, useWorkspace, useWorkspaceDispatch, type InspectorTab } from "../store";
-import { SampleDataNotice } from "../chrome/SampleDataNotice";
+import { ModelNotice } from "../chrome/ModelNotice";
 import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
@@ -71,7 +71,7 @@ export function InspectorPanel() {
             {inspectorTab === "rotation" ? (
               <RotationTab />
             ) : (
-              <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<SampleDataNotice align="end" />}>
+              <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<ModelNotice align="end" />}>
                 <Outlook analysis={analysis} />
               </Section>
             )}
@@ -174,6 +174,16 @@ function Outlook({ analysis }: { readonly analysis: AnalysisState }) {
       <div className="flex items-start gap-2 rounded-lg border border-fair/40 bg-fair/10 p-3 text-[13px] text-text">
         <MapPinOff aria-hidden="true" strokeWidth={1.75} className="mt-0.5 size-4 shrink-0 text-fair" />
         <p>{t.inspector.outside}</p>
+      </div>
+    );
+  }
+
+  if (analysis.result.kind === "missing") {
+    const names = analysis.result.missing.map((id) => t.common.layers[id].toLowerCase());
+    return (
+      <div role="alert" className="flex items-start gap-2 rounded-lg border border-fair/40 bg-fair/10 p-3 text-[13px] text-text">
+        <TriangleAlert aria-hidden="true" strokeWidth={1.75} className="mt-0.5 size-4 shrink-0 text-fair" />
+        <p>{t.inspector.missing(new Intl.ListFormat("en-US").format(names))}</p>
       </div>
     );
   }

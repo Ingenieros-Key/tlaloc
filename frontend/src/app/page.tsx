@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SiteNav } from "@/components/ui/site-nav";
+import { Reveal } from "@/components/ui/reveal";
 import { landingCopy } from "@/components/ui/i18n";
 import { useLang } from "@/lib/i18n-store";
 
@@ -21,31 +22,31 @@ const css = `
   --piedra: #9aa3c7;
   --obsidiana: #060818;
 }
-.tl-main {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 2.5rem 1.5rem 4rem; gap: 1.5rem;
-}
+.tl-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 3rem 1.5rem 4rem; }
+.tl-grid { display: grid; grid-template-columns: 1fr; gap: 2.5rem; width: min(1120px, 94vw); align-items: center; }
+@media (min-width: 900px) { .tl-grid { grid-template-columns: 1.05fr 1fr; gap: 3.5rem; } }
+.tl-col { text-align: left; display: flex; flex-direction: column; gap: 1.25rem; align-items: flex-start; }
 .tl-tag {
   font-family: var(--font-plex-mono), monospace; color: var(--jade);
   font-size: 0.8rem; letter-spacing: 0.22em; text-transform: uppercase;
 }
 .tl-h1 {
   font-family: var(--font-chakra), sans-serif; font-weight: 700;
-  font-size: clamp(1.9rem, 4.5vw, 3.2rem); line-height: 1.08; max-width: 20ch;
+  font-size: clamp(2rem, 4.2vw, 3.4rem); line-height: 1.07;
 }
 .tl-lead {
   font-family: var(--font-plex-sans), sans-serif;
-  max-width: 60ch; color: var(--piedra); font-size: clamp(1rem, 2.2vw, 1.15rem); line-height: 1.7;
+  max-width: 50ch; color: var(--piedra); font-size: clamp(1rem, 1.6vw, 1.15rem); line-height: 1.7;
 }
 .tl-video {
-  width: min(760px, 92vw); height: auto; margin-top: 0.75rem;
-  border-radius: 16px; border: 1px solid rgba(154,163,199,0.25);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.45); background: #000;
+  width: 100%; height: auto; display: block;
+  border-radius: 18px; border: 1px solid rgba(154,163,199,0.25);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.5); background: #000;
 }
 .tl-cta {
-  display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;
+  display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;
   border: 1px solid var(--jade); background: var(--jade); color: var(--obsidiana);
-  border-radius: 999px; padding: 0.7rem 1.6rem; cursor: pointer; text-decoration: none;
+  border-radius: 999px; padding: 0.75rem 1.7rem; cursor: pointer; text-decoration: none;
   font-family: var(--font-plex-mono), monospace; font-size: 0.9rem; font-weight: 500;
   letter-spacing: 0.04em; transition: opacity 0.15s;
 }
@@ -78,16 +79,31 @@ export default function Home() {
       <SiteNav />
 
       <main className="tl-main">
-        <span className="tl-tag">{t.tag}</span>
-        <h1 className="tl-h1">{t.headline}</h1>
-        <p className="tl-lead">{t.description}</p>
-        <video className="tl-video" src="/tlaloc-intro.mp4" controls playsInline preload="metadata" />
-        <Link className="tl-cta" href="/workspace">
-          {t.workspace}
-          <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </Link>
+        <div className="tl-grid">
+          <div className="tl-col">
+            <Reveal delay={0.02}>
+              <span className="tl-tag">{t.tag}</span>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <h1 className="tl-h1">{t.headline}</h1>
+            </Reveal>
+            <Reveal delay={0.18}>
+              <p className="tl-lead">{t.description}</p>
+            </Reveal>
+            <Reveal delay={0.26}>
+              <Link className="tl-cta" href="/workspace">
+                {t.workspace}
+                <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </Link>
+            </Reveal>
+          </div>
+
+          <Reveal delay={0.2}>
+            <video className="tl-video" src="/tlaloc-intro.mp4" controls playsInline preload="metadata" />
+          </Reveal>
+        </div>
       </main>
 
       <footer className="tl-footer">

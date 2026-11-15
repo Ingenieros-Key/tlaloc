@@ -3,11 +3,14 @@ import type { Feature, Polygon } from "geojson";
 /** Layers drawn from the simulated sample grid; these feed the crop assessment. */
 export type SampleLayerId = "humidity" | "rain" | "soil";
 
-/** Data layers shown in the Browser and on the map. All live NASA POWER data. */
-export type LayerId = "precip" | "temp" | "humidity" | "moisture";
+/** Daily data layers from NASA POWER. */
+export type PowerLayerId = "precip" | "temp" | "humidity" | "moisture";
 
-/** What the crop outlook scores. Each comes from NASA POWER or, failing that, the sample grid. */
-export type FactorId = "temp" | "humidity" | "rain" | "soil";
+/** Data layers shown in the Browser and on the map: the daily POWER layers plus static elevation. */
+export type LayerId = PowerLayerId | "elevation";
+
+/** What the crop viability model scores: elevation (NASA SRTM) and NASA POWER climate. */
+export type FactorId = "elevation" | "temp" | "rain" | "humidity";
 
 /** Any layer with a definition: the visible layers plus the factors behind the crop outlook. */
 export type AnyLayerId = SampleLayerId | LayerId | FactorId;
@@ -108,11 +111,11 @@ export type FactorScore = {
   readonly layer: FactorId;
   /** Mean sampled value over the plot, in layer units. */
   readonly value: number;
-  /** 0..100: how close the value is to the crop's ideal band. */
+  /** 0..100: the viability model's aptitude for this value (100 inside the optimum band). */
   readonly score: number;
-  /** Where the value sits relative to the crop's ideal band. */
+  /** Where the value sits relative to the crop's optimum band. */
   readonly position: "below" | "within" | "above";
-  /** Where the value came from: NASA POWER, or the simulated sample grid. */
+  /** Where the value came from: NASA (POWER climate, SRTM elevation), or the simulated sample grid. */
   readonly source: FactorSource;
 };
 
@@ -131,7 +134,9 @@ export type CropAssessment = {
 
 export type Assessment =
   | { readonly kind: "ok"; readonly cellsSampled: number; readonly crops: readonly CropAssessment[] }
-  | { readonly kind: "outside" };
+  | { readonly kind: "outside" }
+  /** NASA had no value for these factors at the plot, and the model needs all four. */
+  | { readonly kind: "missing"; readonly missing: readonly FactorId[] };
 
 export type AnalysisState =
   | { readonly status: "idle" }

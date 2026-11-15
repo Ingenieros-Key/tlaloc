@@ -114,9 +114,7 @@ export const rotation = {
   showFewer: "Show fewer seasons",
   compare: "Compare plans",
   scope: "Guidance only, pending local agronomic validation. It does not guarantee suitability or yield.",
-  sampleNote: "Soil and water ratings, and the sugarcane profile, are sample values.",
-  sampleProfile: "Sample profile",
-  sampleProfileHint: "Placeholder crop profile, not yet reviewed against local agronomy",
+  sampleNote: "Soil and water ratings are sample values.",
 
   form: {
     intro: (plot: string) => `Tell us what you grew on ${plot} so the rotation starts where you are.`,
