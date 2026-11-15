@@ -94,6 +94,8 @@ export const chrome = {
     zoomOut: "Zoom out",
     resetNorth: "Reset north",
     home: "Reset view",
+    dataLayer: "Data layer",
+    dataLayerUnavailable: "Data layer (turn a layer on to use it)",
     timeline: "Timeline",
     timelineUnavailable: "Timeline (turn a layer on to use it)",
     goTo: {

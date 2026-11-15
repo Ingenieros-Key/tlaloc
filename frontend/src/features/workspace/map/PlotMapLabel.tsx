@@ -5,7 +5,8 @@ import type { CropId, Rating } from "../types";
 import { CropIcon } from "../ui/CropIcon";
 
 export type PlotBestCrop = { readonly crop: CropId; readonly score: number; readonly rating: Rating };
-export type PlotReading = { readonly value: string; readonly day: string };
+/** The active layer's value at the plot; `day` is null for elevation, which has no days. */
+export type PlotReading = { readonly value: string; readonly day: string | null };
 
 const RATING_TEXT: Readonly<Record<Rating, string>> = {
   good: "text-good",
@@ -81,7 +82,9 @@ export function PlotMapLabel({
       {reading ? (
         <span className="whitespace-nowrap font-mono text-base font-medium leading-tight text-text tabular">
           {reading.value}
-          <span className="ml-1 font-sans text-[11px] font-normal text-muted">{t.map.plotReading(reading.day)}</span>
+          {reading.day ? (
+            <span className="ml-1 font-sans text-[11px] font-normal text-muted">{t.map.plotReading(reading.day)}</span>
+          ) : null}
         </span>
       ) : null}
     </div>

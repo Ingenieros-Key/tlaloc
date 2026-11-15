@@ -202,17 +202,21 @@ export function MapView() {
   const { activeLayer, layerSettings, dataStyle, layerData, precipPlaying, precipSpeed, basemap, is3d, tool, plot, pin, picking, display } =
     state;
   const { viewMode, secondLayer, layerDataB, scoreData } = state;
+  // The timeline's day, as an index into the timeline layer's dates (the active layer's, or the
+  // second layer's when the active one is elevation, whose single frame then stays put).
   const dayIndex = precipDayIndex(state);
+  const timelineFrames = state.timelineData.status === "ready" ? state.timelineData.frames : null;
   const frames = layerData.status === "ready" ? layerData.frames : null;
-  const dayValues = frames?.values[dayIndex] ?? null;
-  // Two-layer views: the second layer on the same day (or its newest, if that day is not out yet).
+  const dayValues = (frames && (frames.dates.length > 0 ? frames.values[dayIndex] : frames.values[0])) ?? null;
+  // Two-layer views: the second layer on the timeline's day (or its newest, if that day is not out
+  // yet). Elevation as the second layer is its one static frame.
   const framesB = isTwoLayerMode(viewMode) && layerDataB.status === "ready" ? layerDataB.frames : null;
-  const dayDate = frames?.dates[dayIndex];
+  const dayDate = timelineFrames?.dates[dayIndex];
   const dayValuesB = useMemo(() => {
-    if (!framesB || !dayDate) return null;
-    const i = framesB.dates.indexOf(dayDate);
-    return framesB.values[i >= 0 ? i : framesB.dates.length - 1] ?? null;
-  }, [framesB, dayDate]);
+    if (!framesB || !frames) return null;
+    const i = dayDate ? framesB.dates.indexOf(dayDate) : -1;
+    return framesB.values[i >= 0 ? i : framesB.values.length - 1] ?? null;
+  }, [frames, framesB, dayDate]);
   const scoreField = scoreData.status === "ready" ? scoreData.field : null;
   const compare = viewMode === "compare";
   /** Wettest cell of the day on screen, to say so when the whole country is dry. */
@@ -754,7 +758,7 @@ export function MapView() {
 
   // The selected day's values. While the timeline plays, the map blends from what is on screen to
   // the new day over one step, so playback moves continuously instead of jumping day to day.
-  const dayCount = frames?.dates.length ?? 0;
+  const dayCount = timelineFrames?.dates.length ?? 0;
   useEffect(() => {
     const data = dataRef.current;
     const push = () =>
@@ -920,8 +924,11 @@ export function MapView() {
     if (!state.focus || !frames || !dayValues || plotCellIndex === null) return null;
     const value = dayValues[plotCellIndex];
     const day = frames.dates[dayIndex];
-    if (Number.isNaN(value) || !day) return null;
-    return { value: activeLayer ? formatWithUnit(LAYERS[activeLayer], value) : String(value), day: formatDay(day, true) };
+    if (Number.isNaN(value) || (!day && activeLayer !== "elevation")) return null;
+    return {
+      value: activeLayer ? formatWithUnit(LAYERS[activeLayer], value) : String(value),
+      day: day ? formatDay(day, true) : null,
+    };
   }, [state.focus, frames, dayValues, plotCellIndex, dayIndex, activeLayer]);
 
   // Dragging it updates the pin (and so the Go to fields); the camera stays put.
@@ -1030,7 +1037,9 @@ export function MapView() {
           caption={
             layerData.status === "ready" && layerData.frames.dates[dayIndex]
               ? t.map.tooltip.powerSource(formatDay(layerData.frames.dates[dayIndex]))
-              : t.common.sampleData
+              : activeLayer === "elevation"
+                ? t.map.tooltip.elevationSource
+                : t.common.sampleData
           }
         />
       ) : null}

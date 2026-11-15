@@ -13,6 +13,7 @@ export const common = {
     precip: "Precipitation",
     temp: "Temperature",
     moisture: "Soil moisture",
+    elevation: "Elevation",
     soil: "Soil condition",
   } satisfies Record<AnyLayerId, string>,
   layerDescriptions: {
@@ -20,6 +21,7 @@ export const common = {
     temp: "Daily mean air temperature",
     humidity: "Daily relative humidity",
     moisture: "Root-zone soil wetness",
+    elevation: "Height above sea level",
   } satisfies Record<LayerId, string>,
   crops: {
     corn: "Corn",

@@ -33,6 +33,7 @@ export const map = {
   tooltip: {
     outsideRange: "Outside filter range",
     powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,
+    elevationSource: "NASA SRTM · mean per hexagon",
   },
   compare: {
     divider: (left: string, right: string) => `Divider between ${left} (left) and ${right} (right)`,
