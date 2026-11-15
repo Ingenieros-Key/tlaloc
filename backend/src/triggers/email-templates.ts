@@ -75,7 +75,7 @@ function shell(opts: {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;">
             <tr>
               <td align="center" style="background:${COLORS.noche};padding:32px 24px 24px;">
-                <img src="${LOGO_URL}" width="72" height="72" alt="Tlaloc" style="display:block;border:0;border-radius:16px;" />
+                <img src="${LOGO_URL}" width="108" height="108" alt="Tlaloc" style="display:block;border:0;border-radius:20px;" />
                 <div style="color:${COLORS.hueso};font-size:28px;font-weight:700;letter-spacing:0.02em;margin-top:12px;">Tlaloc</div>
               </td>
             </tr>
