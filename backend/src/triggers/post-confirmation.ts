@@ -20,7 +20,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
         Content: {
           Simple: {
             Subject: { Data: subject },
-            Body: { Text: { Data: body } },
+            Body: { Html: { Data: body } },
           },
         },
       }),
