@@ -32,6 +32,8 @@
   --tl-topbar-h: 52px;
   --tl-ribbon-h: 72px;
   --tl-browser-w: 272px;
+  /* The left tool rail: 44px buttons, 4px padding and a 1px border each side. */
+  --tl-rail-w: 54px;
   --tl-inspector-w: 328px;
 
   color-scheme: dark;
@@ -146,13 +148,13 @@ body {
 @media (min-width: 1024px) {
   .maplibregl-map .maplibregl-ctrl-top-right {
     right: calc(var(--tl-inspector-w) + 24px);
-    max-width: calc(100% - var(--tl-browser-w) - var(--tl-inspector-w) - 48px);
+    max-width: calc(100% - var(--tl-rail-w) - var(--tl-browser-w) - var(--tl-inspector-w) - 56px);
   }
 }
 /* No Inspector on screen (no plot, Display closed): the attribution moves to the map's edge. */
 @media (min-width: 1024px) {
   #workspace-canvas[data-inspector="hidden"] .maplibregl-map .maplibregl-ctrl-top-right {
     right: 12px;
-    max-width: calc(100% - var(--tl-browser-w) - 36px);
+    max-width: calc(100% - var(--tl-rail-w) - var(--tl-browser-w) - 44px);
   }
 }

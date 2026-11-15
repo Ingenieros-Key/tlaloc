@@ -1,20 +1,24 @@
 "use client";
 
-import { House, Minus, Navigation2, Plus } from "lucide-react";
+import { ChartNoAxesColumn, House, Minus, Navigation2, Plus } from "lucide-react";
 import { t } from "../strings";
-import { useMapController, useWorkspace } from "../store";
+import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
 import { IconButton } from "../ui/IconButton";
 import { GoToCoordinates } from "./GoToCoordinates";
 
 const s = t.chrome.nav;
 
 /**
- * Fusion-style bottom navigation bar: zoom, reset north (live compass), home, go to coordinates and
- * zoom readout. `relative` anchors the coordinates popover above the bar.
+ * Fusion-style bottom navigation bar: zoom, reset north (live compass), home, go to coordinates, the
+ * timeline's show/hide toggle and zoom readout. `relative` anchors the coordinates popover above
+ * the bar.
  */
 export function NavBar() {
-  const { view } = useWorkspace();
+  const { view, display, layerData } = useWorkspace();
+  const dispatch = useWorkspaceDispatch();
   const controller = useMapController();
+  // The timeline only exists while a layer's days are loaded (never in the Crop score view).
+  const hasTimeline = layerData.status === "ready";
 
   return (
     <div
@@ -42,8 +46,19 @@ export function NavBar() {
       <IconButton icon={House} label={s.home} onClick={() => controller.get()?.resetView()} />
       <GoToCoordinates />
       <Divider />
-      <span aria-hidden="true" className="tabular min-w-14 px-2 text-center font-mono text-xs text-muted">
-        {s.zoomReadout(view.zoom)}
+      <IconButton
+        icon={ChartNoAxesColumn}
+        label={hasTimeline ? s.timeline : s.timelineUnavailable}
+        pressed={hasTimeline && display.timeline}
+        disabled={!hasTimeline}
+        onClick={() => dispatch({ type: "setDisplay", key: "timeline", visible: !display.timeline })}
+      />
+      {/* The readout is the one thing here that is not a control, so phones drop it to fit the bar. */}
+      <span aria-hidden="true" className="flex items-center max-sm:hidden">
+        <Divider />
+        <span className="tabular min-w-14 px-2 text-center font-mono text-xs text-muted">
+          {s.zoomReadout(view.zoom)}
+        </span>
       </span>
     </div>
   );

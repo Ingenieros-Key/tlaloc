@@ -17,22 +17,28 @@ import { summarizePlot } from "./data/plot";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   DEFAULT_PRESET_DAYS,
-  buildPrecipFrames,
+  buildLayerAggregate,
+  buildLayerFrames,
   latestWindow,
+  HUMIDITY_PARAMETER,
   PRECIP_PARAMETER,
-  precipPointQuery,
-  precipRegionalQuery,
+  TEMP_PARAMETER,
+  pointQuery,
+  layerRegionalQuery,
   presetRange,
   type PrecipFrames,
   type PrecipWindow,
 } from "./data/precip";
 import { getSampleGrid } from "./data/sample-grid";
-import { LAYER_ORDER, defaultLayerSettings } from "./layers";
+import { buildScoreField, type ScoreField } from "./data/score";
+import { LAYER_ORDER, defaultLayerSettings, isTwoLayerMode } from "./layers";
 import { t } from "./strings";
 import type {
   AnalysisState,
   Basemap,
+  CropId,
   DataStyle,
+  FactorId,
   DisplayKey,
   DisplaySettings,
   InspectorView,
@@ -42,10 +48,14 @@ import type {
   PlotFeature,
   PlotSummary,
   Tool,
+  ViewMode,
   ViewState,
 } from "./types";
 
 export type PanelId = "browser" | "inspector";
+
+/** What the left flyout shows: the plot list, or the active view mode's controls. */
+export type BrowserSection = "plots" | "tool";
 
 export type PrecipMode = "latest" | "range";
 
@@ -64,6 +74,13 @@ export type PrecipState =
   | { readonly status: "ready"; readonly frames: PrecipFrames; readonly refreshing: boolean }
   | { readonly status: "error"; readonly message: string; readonly retry: () => void };
 
+/** The Crop score view's field: 12 months of NASA POWER data scored for one crop, per cell. */
+export type ScoreState =
+  | { readonly status: "idle" }
+  | { readonly status: "loading" }
+  | { readonly status: "ready"; readonly field: ScoreField }
+  | { readonly status: "error"; readonly retry: () => void };
+
 export type WorkspaceState = {
   readonly tool: Tool;
   readonly basemap: Basemap;
@@ -73,7 +90,21 @@ export type WorkspaceState = {
   readonly layerSettings: Readonly<Record<LayerId, LayerSettings>>;
   /** Hexagons (exact cell values) or a heatmap (smooth surface). */
   readonly dataStyle: DataStyle;
-  readonly precip: PrecipState;
+  /** Daily frames of the active Browser layer (the timeline settings below apply to any layer). */
+  readonly layerData: PrecipState;
+  /** One layer, or a combined view of two layers or of the crop outlook (see `ViewMode`). */
+  readonly viewMode: ViewMode;
+  /**
+   * The other layer of a two-layer view; never the active one. Compare: the right side. Blend: the
+   * vertical axis. Columns: the color (the active layer is the height).
+   */
+  readonly secondLayer: LayerId;
+  /** Daily frames of `secondLayer`, loaded only in a two-layer view. */
+  readonly layerDataB: PrecipState;
+  /** The crop the Crop score view scores. */
+  readonly scoreCrop: CropId;
+  /** The Crop score view's values, loaded only in that view. */
+  readonly scoreData: ScoreState;
   /** "latest": the newest published day (default). "range": a chosen timeframe to scrub and play. */
   readonly precipMode: PrecipMode;
   /** The timeframe used in "range" mode. */
@@ -104,12 +135,17 @@ export type WorkspaceState = {
   readonly picking: boolean;
   readonly inspectorView: InspectorView;
   readonly display: DisplaySettings;
-  /** Floating panel collapsed to its header, only meaningful at lg and up. */
+  /**
+   * lg and up: the Inspector folded to its header, and the left flyout closed (below lg the
+   * flyout is a drawer, see `panels`).
+   */
   readonly collapsed: Readonly<Record<PanelId, boolean>>;
+  /** Which of the tool rail's sections the left flyout shows. */
+  readonly browserSection: BrowserSection;
 };
 
 /** What the reducer owns: everything except state derived from queries. */
-type ReducerState = Omit<WorkspaceState, "precip">;
+type ReducerState = Omit<WorkspaceState, "layerData" | "layerDataB" | "scoreData">;
 
 export type WorkspaceAction =
   | { readonly type: "setTool"; readonly tool: Tool }
@@ -122,6 +158,11 @@ export type WorkspaceAction =
   /** `day` null = follow the newest day. */
   | { readonly type: "setPrecipDay"; readonly day: number | null }
   | { readonly type: "setDataStyle"; readonly style: DataStyle }
+  | { readonly type: "setViewMode"; readonly mode: ViewMode }
+  | { readonly type: "setSecondLayer"; readonly layer: LayerId }
+  /** Two-layer views: the active and second layers trade places. */
+  | { readonly type: "swapLayers" }
+  | { readonly type: "setScoreCrop"; readonly crop: CropId }
   | { readonly type: "setPrecipMode"; readonly mode: PrecipMode }
   | { readonly type: "setPrecipRange"; readonly range: PrecipWindow }
   /** `from` is where playback starts (see `PrecipTimeline`). */
@@ -137,6 +178,7 @@ export type WorkspaceAction =
   | { readonly type: "setView"; readonly view: ViewState }
   | { readonly type: "setPanel"; readonly panel: PanelId; readonly open: boolean }
   | { readonly type: "setCollapsed"; readonly panel: PanelId; readonly collapsed: boolean }
+  | { readonly type: "setBrowserSection"; readonly section: BrowserSection }
   | { readonly type: "setPin"; readonly pin: readonly [number, number] | null }
   | { readonly type: "setPicking"; readonly picking: boolean }
   | { readonly type: "setInspectorView"; readonly view: InspectorView }
@@ -152,6 +194,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   tooltips: true,
   pin: true,
   plotLabel: true,
+  timeline: true,
   navBar: true,
   legends: true,
   limiting: true,
@@ -167,6 +210,9 @@ export const INITIAL_STATE: ReducerState = {
     LayerSettings
   >,
   dataStyle: "hexagons",
+  viewMode: "single",
+  secondLayer: "temp",
+  scoreCrop: "corn",
   precipMode: "latest",
   precipRange: presetRange(DEFAULT_PRESET_DAYS),
   precipDay: null,
@@ -181,11 +227,17 @@ export const INITIAL_STATE: ReducerState = {
   view: { bearing: 0, pitch: 30, zoom: 8 },
   panels: { browser: false, inspector: false },
   collapsed: { browser: false, inspector: false },
+  browserSection: "tool",
   pin: null,
   picking: false,
   inspectorView: "results",
   display: DEFAULT_DISPLAY,
 };
+
+/** A layer other than `layer`: the first in Browser order. */
+function otherLayer(layer: LayerId): LayerId {
+  return LAYER_ORDER.find((id) => id !== layer) ?? layer;
+}
 
 export function workspaceReducer(state: ReducerState, action: WorkspaceAction): ReducerState {
   switch (action.type) {
@@ -196,11 +248,42 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
       return { ...state, basemap: action.basemap };
     case "set3d":
       return { ...state, is3d: action.is3d };
+    case "setViewMode": {
+      if (action.mode === state.viewMode) return state;
+      // A two-layer view needs two different layers on.
+      const twoLayer = isTwoLayerMode(action.mode);
+      const activeLayer = twoLayer ? (state.activeLayer ?? otherLayer(state.secondLayer)) : state.activeLayer;
+      return {
+        ...state,
+        viewMode: action.mode,
+        activeLayer,
+        // Columns only read as columns on a tilted map.
+        is3d: action.mode === "columns" ? true : state.is3d,
+        precipPlaying: false,
+      };
+    }
+    case "setSecondLayer":
+      // Picking the active layer as the second one swaps the two.
+      return action.layer === state.activeLayer
+        ? { ...state, activeLayer: state.secondLayer, secondLayer: action.layer, precipPlaying: false }
+        : { ...state, secondLayer: action.layer };
+    case "swapLayers":
+      return state.activeLayer === null
+        ? state
+        : { ...state, activeLayer: state.secondLayer, secondLayer: state.activeLayer, precipPlaying: false };
+    case "setScoreCrop":
+      return { ...state, scoreCrop: action.crop };
     case "setActiveLayer":
       return {
         ...state,
         activeLayer: action.layer,
-        precipPlaying: action.layer === "precip" && state.precipPlaying,
+        // The second layer is never the active one: taking its layer hands it the old active one.
+        secondLayer:
+          action.layer !== null && action.layer === state.secondLayer
+            ? (state.activeLayer ?? otherLayer(action.layer))
+            : state.secondLayer,
+        // Playback stops when the layer changes: the new layer's days load first.
+        precipPlaying: action.layer !== null && action.layer === state.activeLayer && state.precipPlaying,
       };
     case "setPrecipDay":
       return { ...state, precipDay: action.day, precipPlaying: false };
@@ -285,6 +368,8 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
       return { ...state, panels: { ...state.panels, [action.panel]: action.open } };
     case "setCollapsed":
       return { ...state, collapsed: { ...state.collapsed, [action.panel]: action.collapsed } };
+    case "setBrowserSection":
+      return { ...state, browserSection: action.section };
     case "setPin":
       return { ...state, pin: action.pin };
     case "setInspectorView":
@@ -298,7 +383,12 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
           action.view === "results" && !state.plotSummary ? { ...state.panels, inspector: false } : state.panels,
       };
     case "setDisplay":
-      return { ...state, display: { ...state.display, [action.key]: action.visible } };
+      return {
+        ...state,
+        display: { ...state.display, [action.key]: action.visible },
+        // The timeline holds the pause button, so hiding it also stops playback.
+        precipPlaying: action.key === "timeline" && !action.visible ? false : state.precipPlaying,
+      };
     case "resetDisplay":
       return { ...state, display: DEFAULT_DISPLAY };
     case "setPicking":
@@ -315,6 +405,11 @@ export function inspectorVisible(state: Pick<WorkspaceState, "inspectorView" | "
   return state.inspectorView === "display" || state.plotSummary !== null;
 }
 
+/** lg and up: whether the left flyout is open beside the tool rail (it takes map room there). */
+export function browserVisible(state: Pick<WorkspaceState, "collapsed">): boolean {
+  return !state.collapsed.browser;
+}
+
 /** Longest plot name kept; enough for "North field, beans 2026" and still fits a map label. */
 export const PLOT_NAME_MAX = 40;
 
@@ -324,8 +419,8 @@ export function lastDay(precip: PrecipState): number {
 }
 
 /** Frame to draw: the newest day in "latest" mode, else the chosen day of the timeframe. */
-export function precipDayIndex(state: Pick<WorkspaceState, "precip" | "precipDay" | "precipMode">): number {
-  const last = lastDay(state.precip);
+export function precipDayIndex(state: Pick<WorkspaceState, "layerData" | "precipDay" | "precipMode">): number {
+  const last = lastDay(state.layerData);
   if (state.precipMode === "latest") return last;
   return Math.min(last, Math.max(0, state.precipDay ?? last));
 }
@@ -365,27 +460,32 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   const registry = useMemo(() => ({ register, get }), [register, get]);
 
   const { plot, analysisNonce } = state;
-  const plotRain = usePlotRainfall(state.plotSummary?.centroid ?? null);
+  const plotClimate = usePlotClimate(state.plotSummary?.centroid ?? null);
   useEffect(() => {
-    // The outlook waits for the plot's NASA rainfall; if that request fails it falls back to the
-    // sample value, and the factor says so.
-    if (!plot || plotRain.status === "loading") return;
-    const measured = plotRain.status === "ready" ? { rain: plotRain.mm } : {};
+    // The outlook waits for the plot's NASA climate; if that request fails it falls back to the
+    // sample values, and each factor says where its value came from.
+    if (!plot || plotClimate.status === "loading") return;
+    const measured = plotClimate.status === "ready" ? plotClimate.measured : {};
     const timer = window.setTimeout(() => {
       const result = computeAssessment(plot, getSampleGrid(), measured);
       dispatch({ type: "analysisFinished", analysis: { status: "done", result } });
     }, ANALYSIS_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [plot, analysisNonce, plotRain]);
+  }, [plot, analysisNonce, plotClimate]);
 
-  const precip = usePrecipQuery(
-    state.activeLayer === "precip",
-    state.precipMode === "latest" ? null : state.precipRange,
+  const range = state.precipMode === "latest" ? null : state.precipRange;
+  const scoring = state.viewMode === "score";
+  // The score view has no day to show, so it leaves the daily layers alone.
+  const layerData = useLayerQuery(scoring ? null : state.activeLayer, range);
+  const layerDataB = useLayerQuery(isTwoLayerMode(state.viewMode) ? state.secondLayer : null, range);
+  const scoreData = useScoreData(scoring, state.scoreCrop);
+  const value = useMemo<WorkspaceState>(
+    () => ({ ...state, layerData, layerDataB, scoreData }),
+    [state, layerData, layerDataB, scoreData],
   );
-  const value = useMemo<WorkspaceState>(() => ({ ...state, precip }), [state, precip]);
 
   const { precipPlaying, precipSpeed } = state;
-  const last = lastDay(precip);
+  const last = lastDay(layerData);
   useEffect(() => {
     if (!precipPlaying) return;
     const timer = window.setInterval(() => dispatch({ type: "stepPrecip", last }), stepMs(last + 1, precipSpeed));
@@ -402,18 +502,34 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
 }
 
 /**
- * Precipitation frames for a timeframe, or for the newest days when `range` is null ("latest"). The
- * query starts once the layer is shown and is cached (and persisted) by TanStack Query, so reloads
- * and revisited timeframes skip the fetch. While a new timeframe loads, the previous one stays up.
+ * The active layer's frames for a timeframe, or for the newest days when `range` is null
+ * ("latest"). Each layer loads the first time it is shown and is then cached (and persisted) by
+ * TanStack Query, so switching back, reloading or revisiting a timeframe skips the fetch. While a
+ * new timeframe loads, the same layer's previous one stays up; another layer's never does, since
+ * its values would be read against the wrong scale.
  */
-function usePrecipQuery(enabled: boolean, range: PrecipWindow | null): PrecipState {
+/** The parameters a POWER query key asks for, as a comparable string. */
+function keyParameters(key: readonly unknown[]): string {
+  return JSON.stringify((key[3] as { readonly parameters?: readonly string[] } | undefined)?.parameters);
+}
+
+function useLayerQuery(layer: LayerId | null, range: PrecipWindow | null): PrecipState {
   const [latest] = useState(latestWindow);
+  const enabled = layer !== null;
+  const options = layerRegionalQuery(layer ?? "precip", range ?? latest);
+  const parameterKey = keyParameters(options.queryKey);
   const { data, error, isError, isPlaceholderData, refetch } = useQuery({
-    ...precipRegionalQuery(range ?? latest),
+    ...options,
     enabled,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && keyParameters(previousQuery.queryKey) === parameterKey
+        ? keepPreviousData(previous)
+        : undefined,
   });
-  const frames = useMemo(() => (data ? buildPrecipFrames(data.data) : null), [data]);
+  const frames = useMemo(
+    () => (data && layer ? buildLayerFrames(data.data, layer) : null),
+    [data, layer],
+  );
   return useMemo<PrecipState>(() => {
     if (frames && !(isError && isPlaceholderData)) {
       return { status: "ready", frames, refreshing: isPlaceholderData };
@@ -429,40 +545,104 @@ function usePrecipQuery(enabled: boolean, range: PrecipWindow | null): PrecipSta
   }, [frames, isError, isPlaceholderData, error, refetch, enabled]);
 }
 
-type PlotRain =
+/** Days the crop outlook looks back over. */
+const OUTLOOK_DAYS = 365;
+
+/**
+ * The Crop score view: the last 12 months of rainfall, temperature and humidity over the country
+ * (three regional requests, cached like any layer), reduced to one value per cell and scored for
+ * `crop` with the plot outlook's rules. Changing the crop only re-scores.
+ */
+function useScoreData(enabled: boolean, crop: CropId): ScoreState {
+  const [range] = useState(() => presetRange(OUTLOOK_DAYS));
+  const rain = useQuery({ ...layerRegionalQuery("precip", range), enabled });
+  const temp = useQuery({ ...layerRegionalQuery("temp", range), enabled });
+  const humidity = useQuery({ ...layerRegionalQuery("humidity", range), enabled });
+  const rainData = rain.data;
+  const tempData = temp.data;
+  const humidityData = humidity.data;
+  const climate = useMemo(
+    () =>
+      enabled && rainData && tempData && humidityData
+        ? {
+            rain: buildLayerAggregate(rainData.data, "precip", OUTLOOK_DAYS),
+            temp: buildLayerAggregate(tempData.data, "temp", OUTLOOK_DAYS),
+            humidity: buildLayerAggregate(humidityData.data, "humidity", OUTLOOK_DAYS),
+          }
+        : null,
+    [enabled, rainData, tempData, humidityData],
+  );
+  const field = useMemo(() => (climate ? buildScoreField(climate, crop) : null), [climate, crop]);
+  const failed = rain.isError || temp.isError || humidity.isError;
+  const refetchRain = rain.refetch;
+  const refetchTemp = temp.refetch;
+  const refetchHumidity = humidity.refetch;
+  return useMemo<ScoreState>(() => {
+    if (!enabled) return { status: "idle" };
+    if (field) return { status: "ready", field };
+    if (failed) {
+      return {
+        status: "error",
+        retry: () => {
+          void refetchRain();
+          void refetchTemp();
+          void refetchHumidity();
+        },
+      };
+    }
+    return { status: "loading" };
+  }, [enabled, field, failed, refetchRain, refetchTemp, refetchHumidity]);
+}
+
+/** The plot's climate over the last 12 months, from NASA POWER. */
+type PlotClimate =
   | { readonly status: "none" | "loading" | "error" }
-  | { readonly status: "ready"; readonly mm: number };
+  | { readonly status: "ready"; readonly measured: Partial<Record<FactorId, number>> };
 
 /** Plot centres are rounded to ~5 km: POWER's cells are ~55 km, so small edits reuse the answer. */
-function roundForRain(value: number): number {
+function roundForClimate(value: number): number {
   return Math.round(value * 20) / 20;
 }
 
+/** Sum and count of the valid (non-missing) days of a daily series. */
+function totals(series: Readonly<Record<string, number | null>> | undefined): { sum: number; days: number } {
+  let sum = 0;
+  let days = 0;
+  for (const value of Object.values(series ?? {})) {
+    if (value === null) continue;
+    sum += value;
+    days += 1;
+  }
+  return { sum, days };
+}
+
 /**
- * Rainfall over the last 12 months at the plot, from NASA POWER (mm). Missing days are skipped
- * and the total scaled back to a full year, so a publishing lag does not read as a drier year.
+ * The crop outlook's measured factors at the plot, from one NASA POWER request over the last 12
+ * months: rainfall (total, scaled to a full year when the newest days are not published yet),
+ * relative humidity and air temperature (both means). Any parameter without data is left out, so
+ * the outlook falls back to the sample value for it (or skips temperature, which has none).
  */
-function usePlotRainfall(center: readonly [number, number] | null): PlotRain {
-  const [range] = useState(() => presetRange(365));
-  const lng = center ? roundForRain(center[0]) : null;
-  const lat = center ? roundForRain(center[1]) : null;
+function usePlotClimate(center: readonly [number, number] | null): PlotClimate {
+  const [range] = useState(() => presetRange(OUTLOOK_DAYS));
+  const lng = center ? roundForClimate(center[0]) : null;
+  const lat = center ? roundForClimate(center[1]) : null;
   const query = useQuery({
-    ...precipPointQuery([lng ?? 0, lat ?? 0], range),
+    ...pointQuery([lng ?? 0, lat ?? 0], range, [PRECIP_PARAMETER, HUMIDITY_PARAMETER, TEMP_PARAMETER]),
     enabled: lng !== null && lat !== null,
   });
   const { data, isError } = query;
-  return useMemo<PlotRain>(() => {
+  return useMemo<PlotClimate>(() => {
     if (lng === null) return { status: "none" };
     if (data) {
-      const series = data.data.series[PRECIP_PARAMETER] ?? {};
-      let total = 0;
-      let days = 0;
-      for (const value of Object.values(series)) {
-        if (value === null) continue;
-        total += value;
-        days += 1;
-      }
-      return days > 0 ? { status: "ready", mm: (total * 365) / days } : { status: "error" };
+      const series = data.data.series;
+      const measured: Partial<Record<FactorId, number>> = {};
+      const rain = totals(series[PRECIP_PARAMETER]);
+      if (rain.days > 0) measured.rain = (rain.sum * OUTLOOK_DAYS) / rain.days;
+      const humidity = totals(series[HUMIDITY_PARAMETER]);
+      if (humidity.days > 0) measured.humidity = humidity.sum / humidity.days;
+      const temp = totals(series[TEMP_PARAMETER]);
+      if (temp.days > 0) measured.temp = temp.sum / temp.days;
+      return Object.keys(measured).length > 0 ? { status: "ready", measured } : { status: "error" };
     }
     return isError ? { status: "error" } : { status: "loading" };
   }, [lng, data, isError]);

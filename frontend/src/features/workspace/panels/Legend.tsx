@@ -4,7 +4,7 @@ import type { LayerDef } from "../types";
 import { formatWithUnit } from "./format";
 
 /** Domain ends are round numbers, so they read "0 mm", not "0.0 mm". */
-function formatLegendEnd(layer: LayerDef, value: number): string {
+export function formatLegendEnd(layer: LayerDef, value: number): string {
   return Number.isInteger(value) ? t.inspector.withUnit(value.toLocaleString("en-US"), layer.unit) : formatWithUnit(layer, value);
 }
 
@@ -15,16 +15,19 @@ function formatLegendEnd(layer: LayerDef, value: number): string {
 export function Legend({
   layer,
   range,
+  title = t.browser.legend,
 }: {
   readonly layer: LayerDef;
   readonly range: readonly [number, number];
+  /** Heading above the ramp; combined views name the layer and its role here. */
+  readonly title?: string;
 }) {
   const [min, max] = layer.domain;
   const pct = (v: number) => ((v - min) / (max - min)) * 100;
 
   return (
     <div>
-      <p className="text-xs text-muted">{t.browser.legend}</p>
+      <p className="text-xs text-muted">{title}</p>
       <div
         aria-hidden="true"
         className="relative mt-1.5 h-2.5 overflow-hidden rounded-sm ring-1 ring-inset ring-line"

@@ -80,6 +80,10 @@ export const chrome = {
     tooltip: (description: string, shortcut?: string, unavailable?: string): string =>
       `${description}${shortcut ? ` (${shortcut})` : ""}${unavailable ? ` - ${unavailable}` : ""}`,
   },
+  rail: {
+    label: "Data tools",
+    plots: "Plots",
+  },
   undo: {
     deleted: "Plot deleted.",
     undo: "Undo",
@@ -90,6 +94,8 @@ export const chrome = {
     zoomOut: "Zoom out",
     resetNorth: "Reset north",
     home: "Reset view",
+    timeline: "Timeline",
+    timelineUnavailable: "Timeline (turn a layer on to use it)",
     goTo: {
       button: "Go to",
       title: "Go to",

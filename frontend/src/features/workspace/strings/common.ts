@@ -5,16 +5,21 @@ export const common = {
   appName: "Tlaloc",
   sampleData: "Sample data",
   sampleDataHint:
-    "Rainfall in the crop outlook is NASA POWER data: the last 12 months at your plot (marked NASA). Humidity and soil condition are still simulated for demonstration.",
+    "Temperature, humidity and rainfall in the crop outlook are NASA POWER data: the last 12 months at your plot (marked NASA). Soil condition is still simulated for demonstration.",
   partlySample: "Partly sample",
   layers: {
     humidity: "Humidity",
     rain: "Rainfall",
     precip: "Precipitation",
+    temp: "Temperature",
+    moisture: "Soil moisture",
     soil: "Soil condition",
   } satisfies Record<AnyLayerId, string>,
   layerDescriptions: {
-    precip: "NASA POWER, daily",
+    precip: "Daily rainfall",
+    temp: "Daily mean air temperature",
+    humidity: "Daily relative humidity",
+    moisture: "Root-zone soil wetness",
   } satisfies Record<LayerId, string>,
   crops: {
     corn: "Corn",

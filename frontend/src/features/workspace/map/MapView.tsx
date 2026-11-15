@@ -17,9 +17,13 @@ import { createPortal } from "react-dom";
 import type { TerraDraw } from "terra-draw";
 import type { Theme } from "@/lib/theme";
 import { useAppTheme } from "../hooks/useAppTheme";
-import { formatDay } from "../panels/format";
-import { LAYERS, formatValue } from "../layers";
+import { formatDay, formatWithUnit } from "../panels/format";
+import { RATING_THRESHOLDS } from "../data/crops";
+import { heightDomain } from "../data/precip";
+import type { ScoreField } from "../data/score";
+import { FACTOR_ORDER, LAYERS, LAYER_BREAKS, formatValue, isTwoLayerMode, valueClass } from "../layers";
 import {
+  browserVisible,
   inspectorVisible,
   precipDayIndex,
   stepMs,
@@ -29,7 +33,7 @@ import {
   type WorkspaceState,
 } from "../store";
 import { t } from "../strings";
-import type { Basemap, DataField, LayerId, LayerSettings, MapController, ViewState } from "../types";
+import type { Basemap, DataField, LayerId, LayerSettings, MapController, Rating, ViewState } from "../types";
 import { IconButton } from "../ui/IconButton";
 import {
   FALLBACK_STYLE,
@@ -38,7 +42,8 @@ import {
   needsStyleSwap,
   setBasemapLabels,
 } from "./basemaps";
-import { DATA_LAYER_ID, buildDeckLayers, deckGroupId } from "./deckLayers";
+import { CompareDivider, type DividerMove } from "./CompareDivider";
+import { DATA_LAYER_B_ID, DATA_LAYER_ID, buildDeckLayers, deckGroupId, type SplitLine } from "./deckLayers";
 import { PlotMapLabel, type PlotBestCrop, type PlotReading } from "./PlotMapLabel";
 import { MAP_CONTAINER_ID } from "./focus";
 import {
@@ -112,17 +117,41 @@ function roundView(map: MapLibreMap): ViewState {
   };
 }
 
-/** Deck layers for the current state and field (empty during globe flights). */
+/** What the deck layers draw that is not workspace state: the values on screen and the divider. */
+type DeckData = {
+  /** The active layer's values. Usually the selected day; mid-blend while the timeline plays. */
+  a: DataField | null;
+  /** The second layer's values for the same day (two-layer views). */
+  b: DataField | null;
+  /** Crop scores (score view). */
+  score: DataField | null;
+  /** Compare's divider on the ground. */
+  split: SplitLine | null;
+};
+
+/** Deck layers for the current state and data (empty during globe flights). */
 function deckLayersFor(
   s: WorkspaceState,
-  field: DataField | null,
+  data: DeckData,
   beforeId: string | undefined,
   globe: boolean,
   theme: Theme,
 ): Layer[] {
   if (globe) return [];
   return buildDeckLayers({
-    field,
+    field: data.a,
+    fieldB: data.b,
+    score: data.score,
+    mode: s.viewMode,
+    secondLayer: s.secondLayer,
+    split: data.split,
+    heightDomain: s.activeLayer
+      ? heightDomain(
+          s.activeLayer,
+          LAYERS[s.activeLayer].domain,
+          s.layerData.status === "ready" ? s.layerData.frames : null,
+        )
+      : [0, 1],
     activeLayer: s.activeLayer,
     layerSettings: s.layerSettings,
     style: s.dataStyle,
@@ -170,11 +199,22 @@ export function MapView() {
   const state = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const { register } = useMapController();
-  const { activeLayer, layerSettings, dataStyle, precip, precipPlaying, precipSpeed, basemap, is3d, tool, plot, pin, picking, display } =
+  const { activeLayer, layerSettings, dataStyle, layerData, precipPlaying, precipSpeed, basemap, is3d, tool, plot, pin, picking, display } =
     state;
+  const { viewMode, secondLayer, layerDataB, scoreData } = state;
   const dayIndex = precipDayIndex(state);
-  const frames = precip.status === "ready" ? precip.frames : null;
+  const frames = layerData.status === "ready" ? layerData.frames : null;
   const dayValues = frames?.values[dayIndex] ?? null;
+  // Two-layer views: the second layer on the same day (or its newest, if that day is not out yet).
+  const framesB = isTwoLayerMode(viewMode) && layerDataB.status === "ready" ? layerDataB.frames : null;
+  const dayDate = frames?.dates[dayIndex];
+  const dayValuesB = useMemo(() => {
+    if (!framesB || !dayDate) return null;
+    const i = framesB.dates.indexOf(dayDate);
+    return framesB.values[i >= 0 ? i : framesB.dates.length - 1] ?? null;
+  }, [framesB, dayDate]);
+  const scoreField = scoreData.status === "ready" ? scoreData.field : null;
+  const compare = viewMode === "compare";
   /** Wettest cell of the day on screen, to say so when the whole country is dry. */
   const dayMax = useMemo(() => {
     if (!dayValues) return null;
@@ -205,9 +245,14 @@ export function MapView() {
    * projection and deck layers stay hidden until it lands.
    */
   const globeRef = useRef(false);
-  /** Values on screen. Usually the selected day; mid-blend while the timeline plays. */
-  const fieldRef = useRef<DataField | null>(null);
+  /** Values on screen and Compare's divider (see `DeckData`). */
+  const dataRef = useRef<DeckData>({ a: null, b: null, score: null, split: null });
   const fieldVersionRef = useRef(0);
+  /** Compare: where the divider sits across the part of the map the panels leave free, 0 to 1. */
+  const splitFracRef = useRef(0.5);
+  const dividerRef = useRef<HTMLDivElement>(null);
+  /** Re-places the divider now (set while Compare is on). */
+  const refreshSplitRef = useRef<(() => void) | null>(null);
 
   const [beforeId, setBeforeId] = useState<string | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
@@ -236,7 +281,7 @@ export function MapView() {
       ? { center: INTRO_CENTER, zoom: INTRO_ZOOM, pitch: 0 }
       : {
           bounds: COUNTRY_BOUNDS,
-          fitBoundsOptions: { padding: cameraPadding(container, inspectorVisible(stateRef.current)) },
+          fitBoundsOptions: { padding: cameraPadding(container, inspectorVisible(stateRef.current), browserVisible(stateRef.current)) },
           pitch: initial.is3d ? PITCH_3D : 0,
         };
 
@@ -265,7 +310,7 @@ export function MapView() {
     let moveFrame = 0;
 
     const currentLayers = () =>
-      deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current, themeRef.current);
+      deckLayersFor(stateRef.current, dataRef.current, beforeIdRef.current, globeRef.current, themeRef.current);
 
     // Globe flights. The intro starts in globe mode (set above); "Go to" enters it on demand.
     let introTimer = 0;
@@ -313,15 +358,20 @@ export function MapView() {
     };
 
     const onHover = (info: PickingInfo) => {
-      const field = fieldRef.current;
+      const field = dataRef.current.a;
       let index: number | null = null;
-      if (info.layer?.id === DATA_LAYER_ID && info.index >= 0) {
+      if ((info.layer?.id === DATA_LAYER_ID || info.layer?.id === DATA_LAYER_B_ID) && info.index >= 0) {
         // In focus the drawn pieces carry the index of the cell they were cut from.
         const piece = info.object as { index?: number } | undefined;
         index = typeof piece?.index === "number" ? piece.index : info.index;
       }
       // The heatmap is not pickable, so look up the cell under the pointer instead.
-      else if (field && info.coordinate && stateRef.current.dataStyle === "heatmap") {
+      else if (
+        field &&
+        info.coordinate &&
+        stateRef.current.viewMode === "single" &&
+        stateRef.current.dataStyle === "heatmap"
+      ) {
         index = nearestCell(field, info.coordinate);
       }
       if (index === null) {
@@ -404,7 +454,7 @@ export function MapView() {
 
     const fitCountry = (duration: number) => {
       map.fitBounds(COUNTRY_BOUNDS, {
-        padding: cameraPadding(container, inspectorVisible(stateRef.current)),
+        padding: cameraPadding(container, inspectorVisible(stateRef.current), browserVisible(stateRef.current)),
         bearing: 0,
         pitch: stateRef.current.is3d ? PITCH_3D : 0,
         duration,
@@ -415,7 +465,7 @@ export function MapView() {
       map.fitBounds(bounds, {
         // A plot always brings up the Inspector with its results, even if this runs a moment before
         // it renders, so leave room for it.
-        padding: cameraPadding(container, true),
+        padding: cameraPadding(container, true, browserVisible(stateRef.current)),
         maxZoom: PLOT_MAX_ZOOM,
         // Keep the user's rotation: fitBounds would otherwise snap back to north.
         bearing: map.getBearing(),
@@ -443,7 +493,7 @@ export function MapView() {
           zoom: Math.max(map.getZoom(), GOTO_MIN_ZOOM),
           bearing: 0,
           pitch: stateRef.current.is3d ? PITCH_3D : 0,
-          padding: cameraPadding(container, inspectorVisible(stateRef.current)),
+          padding: cameraPadding(container, inspectorVisible(stateRef.current), browserVisible(stateRef.current)),
         };
         if (motionMs(1) === 0) {
           map.jumpTo(target);
@@ -613,49 +663,136 @@ export function MapView() {
   }, [dispatch, register]);
 
   // Settings that change the deck layers (the field itself is pushed by the effect below).
-  const heatmapZoom = dataStyle === "heatmap" ? state.view.zoom : 0;
+  // The heatmap's kernel and the columns' height are sized in pixels, so both follow the zoom.
+  const sizedZoom = dataStyle === "heatmap" || viewMode === "columns" ? state.view.zoom : 0;
   useEffect(() => {
     overlayRef.current?.setProps({
-      layers: deckLayersFor(stateRef.current, fieldRef.current, beforeId, globeActive, theme),
+      layers: deckLayersFor(stateRef.current, dataRef.current, beforeId, globeActive, theme),
     });
-  }, [globeActive, activeLayer, layerSettings, dataStyle, heatmapZoom, beforeId, display, theme, basemap, state.focus, state.plot]);
+  }, [globeActive, activeLayer, secondLayer, viewMode, layerSettings, dataStyle, sizedZoom, beforeId, display, theme, basemap, state.focus, state.plot]);
+
+  // Crop score view: one static field per crop.
+  useEffect(() => {
+    dataRef.current.score = scoreField
+      ? { cells: scoreField.cells, values: scoreField.scores, version: scoreField.version }
+      : null;
+    overlayRef.current?.setProps({
+      layers: deckLayersFor(stateRef.current, dataRef.current, beforeIdRef.current, globeRef.current, themeRef.current),
+    });
+  }, [scoreField]);
+
+  // Compare: the divider is a vertical screen line, so its place on the ground changes with every
+  // camera move. Re-placed once per frame; the cells it crosses are cut along it (see deckLayers).
+  const inspectorShown = inspectorVisible(state);
+  const browserShown = browserVisible(state);
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    const data = dataRef.current;
+    if (!map || !container || !loaded || !compare || globeActive) return;
+    const lngLat = (x: number, y: number): [number, number] => {
+      const p = map.unproject([x, y]);
+      return [p.lng, p.lat];
+    };
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const pad = cameraPadding(container, inspectorVisible(stateRef.current), browserVisible(stateRef.current));
+      const left = pad.left ?? 0;
+      const free = Math.max(1, container.clientWidth - left - (pad.right ?? 0));
+      const x = left + splitFracRef.current * free;
+      const height = container.clientHeight;
+      data.split = { a: lngLat(x, 0), b: lngLat(x, height), left: lngLat(x - 100, height / 2) };
+      const divider = dividerRef.current;
+      if (divider) {
+        divider.style.transform = `translateX(${x}px)`;
+        divider
+          .querySelector("[role='slider']")
+          ?.setAttribute("aria-valuenow", String(Math.round(splitFracRef.current * 100)));
+      }
+      overlayRef.current?.setProps({
+        layers: deckLayersFor(stateRef.current, data, beforeIdRef.current, globeRef.current, themeRef.current),
+      });
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    refreshSplitRef.current = update;
+    update();
+    map.on("move", schedule);
+    map.on("resize", schedule);
+    return () => {
+      map.off("move", schedule);
+      map.off("resize", schedule);
+      if (frame) cancelAnimationFrame(frame);
+      refreshSplitRef.current = null;
+      data.split = null;
+    };
+  }, [compare, loaded, globeActive, inspectorShown, browserShown]);
+
+  /** Moves the divider to a pointer position (`clientX`) or by a step (`delta`, in fractions). */
+  const moveSplit = (to: DividerMove) => {
+    const container = containerRef.current;
+    if (!container) return;
+    let frac = splitFracRef.current;
+    if ("clientX" in to) {
+      const pad = cameraPadding(container, inspectorVisible(stateRef.current), browserVisible(stateRef.current));
+      const left = pad.left ?? 0;
+      const free = Math.max(1, container.clientWidth - left - (pad.right ?? 0));
+      frac = (to.clientX - container.getBoundingClientRect().left - left) / free;
+    } else if ("delta" in to) {
+      frac += to.delta;
+    } else {
+      frac = to.frac;
+    }
+    splitFracRef.current = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, frac));
+    refreshSplitRef.current?.();
+  };
 
   // The selected day's values. While the timeline plays, the map blends from what is on screen to
   // the new day over one step, so playback moves continuously instead of jumping day to day.
   const dayCount = frames?.dates.length ?? 0;
   useEffect(() => {
+    const data = dataRef.current;
     const push = () =>
       overlayRef.current?.setProps({
-        layers: deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current, themeRef.current),
+        layers: deckLayersFor(stateRef.current, data, beforeIdRef.current, globeRef.current, themeRef.current),
       });
     const nextVersion = () => (fieldVersionRef.current += 1);
 
     if (!frames || !dayValues) {
-      fieldRef.current = null;
+      data.a = null;
+      data.b = null;
       push();
       return;
     }
+    // Both layers sit on the same grid, so the second one reuses the first one's cells.
     const cells = frames.hexes;
-    const prev = fieldRef.current;
+    const field = (values: Float32Array | null): DataField | null =>
+      values ? { cells, values, version: nextVersion() } : null;
+    const prev = data.a;
     const duration = motionMs(stepMs(dayCount, precipSpeed));
     if (!precipPlaying || !prev || prev.cells !== cells || duration === 0) {
-      fieldRef.current = { cells, values: dayValues, version: nextVersion() };
+      data.a = field(dayValues);
+      data.b = field(dayValuesB);
       push();
       return;
     }
 
     const from = prev.values;
+    const fromB = data.b?.values ?? null;
     const start = performance.now();
     let frame = 0;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      fieldRef.current = { cells, values: t >= 1 ? dayValues : blend(from, dayValues, t), version: nextVersion() };
+      data.a = field(t >= 1 ? dayValues : blend(from, dayValues, t));
+      data.b = field(dayValuesB && fromB && t < 1 ? blend(fromB, dayValuesB, t) : dayValuesB);
       push();
       if (t < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [frames, dayValues, precipPlaying, dayCount, precipSpeed]);
+  }, [frames, dayValues, dayValuesB, precipPlaying, dayCount, precipSpeed]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -697,7 +834,7 @@ export function MapView() {
     drawRef.current = null;
     beforeIdRef.current = undefined;
     overlayRef.current?.setProps({
-      layers: deckLayersFor(stateRef.current, fieldRef.current, undefined, globeRef.current, theme),
+      layers: deckLayersFor(stateRef.current, dataRef.current, undefined, globeRef.current, theme),
     });
     map.setStyle(basemapStyle(basemap, theme), { diff: false });
   }, [basemap, theme]);
@@ -781,8 +918,8 @@ export function MapView() {
     const value = dayValues[plotCellIndex];
     const day = frames.dates[dayIndex];
     if (Number.isNaN(value) || !day) return null;
-    return { value: t.map.millimetres(value.toLocaleString("en-US", { maximumFractionDigits: 1 })), day: formatDay(day, true) };
-  }, [state.focus, frames, dayValues, plotCellIndex, dayIndex]);
+    return { value: activeLayer ? formatWithUnit(LAYERS[activeLayer], value) : String(value), day: formatDay(day, true) };
+  }, [state.focus, frames, dayValues, plotCellIndex, dayIndex, activeLayer]);
 
   // Dragging it updates the pin (and so the Go to fields); the camera stays put.
   useEffect(() => {
@@ -858,7 +995,29 @@ export function MapView() {
   return (
     <div role="region" aria-label={t.map.regionLabel} className="absolute inset-0 bg-bg">
       <div id={MAP_CONTAINER_ID} ref={containerRef} className="h-full w-full" />
-      {hover && activeLayer && display.tooltips ? (
+      {compare && loaded && !globeActive && activeLayer ? (
+        <CompareDivider
+          ref={dividerRef}
+          leftLabel={t.common.layers[activeLayer]}
+          rightLabel={t.common.layers[secondLayer]}
+          onMove={moveSplit}
+        />
+      ) : null}
+      {hover && display.tooltips && viewMode === "score" && scoreField ? (
+        <ScoreTooltip hover={hover} field={scoreField} />
+      ) : null}
+      {hover && display.tooltips && isTwoLayerMode(viewMode) && activeLayer && dayValues && dayValuesB && dayDate ? (
+        <PairTooltip
+          hover={hover}
+          rows={[
+            { layer: activeLayer, value: dayValues[hover.index] },
+            { layer: secondLayer, value: dayValuesB[hover.index] },
+          ]}
+          classes={viewMode === "blend"}
+          caption={t.map.tooltip.powerSource(formatDay(dayDate))}
+        />
+      ) : null}
+      {hover && activeLayer && display.tooltips && viewMode === "single" ? (
         <CellTooltip
           hover={hover}
           layer={activeLayer}
@@ -866,8 +1025,8 @@ export function MapView() {
           // Read the value from the frame on screen, so it follows the timeline while playing.
           value={dayValues && !Number.isNaN(dayValues[hover.index]) ? dayValues[hover.index] : undefined}
           caption={
-            precip.status === "ready" && precip.frames.dates[dayIndex]
-              ? t.map.tooltip.powerSource(formatDay(precip.frames.dates[dayIndex]))
+            layerData.status === "ready" && layerData.frames.dates[dayIndex]
+              ? t.map.tooltip.powerSource(formatDay(layerData.frames.dates[dayIndex]))
               : t.common.sampleData
           }
         />
@@ -885,6 +1044,10 @@ export function MapView() {
     </div>
   );
 }
+
+/** Compare: how close to either end of its travel the divider may go. */
+const SPLIT_MIN = 0.04;
+const SPLIT_MAX = 0.96;
 
 /** Below this size on screen (px, longest side) the plot label becomes a compact crop marker. */
 const PLOT_COMPACT_PX = 28;
@@ -905,6 +1068,95 @@ function DryDayChip({ max }: { readonly max: number }) {
     >
       <Sun aria-hidden="true" strokeWidth={1.75} className="size-3.5 text-muted" />
       {t.map.dryDay(max.toLocaleString("en-US", { maximumFractionDigits: 1 }))}
+    </div>
+  );
+}
+
+/** Where a tooltip sits: beside the pointer, flipped to its left near the right edge. */
+function tooltipTransform(hover: Hover): string {
+  const offset = 14;
+  return hover.flip
+    ? `translate(calc(${hover.x - offset}px - 100%), ${hover.y + offset}px)`
+    : `translate(${hover.x + offset}px, ${hover.y + offset}px)`;
+}
+
+const TOOLTIP_CLASS =
+  "pointer-events-none absolute left-0 top-0 z-[5] min-w-36 rounded-md border border-line-strong bg-surface-2 px-2.5 py-1.5 shadow-lg shadow-black/40";
+
+/** Two-layer views: both layers' values for the hovered cell, with their class in Blend. */
+function PairTooltip({
+  hover,
+  rows,
+  classes,
+  caption,
+}: {
+  readonly hover: Hover;
+  readonly rows: readonly { readonly layer: LayerId; readonly value: number }[];
+  readonly classes: boolean;
+  readonly caption: string;
+}) {
+  if (rows.every(({ value }) => value === undefined || Number.isNaN(value))) return null;
+  return (
+    <div aria-hidden="true" style={{ transform: tooltipTransform(hover) }} className={TOOLTIP_CLASS}>
+      <dl className="grid grid-cols-[auto_auto] items-baseline gap-x-3 gap-y-0.5">
+        {rows.map(({ layer, value }) => {
+          const missing = value === undefined || Number.isNaN(value);
+          const [low, high] = LAYER_BREAKS[layer];
+          return (
+            <div key={layer} className="contents">
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-muted">{t.common.layers[layer]}</dt>
+              <dd className="text-right font-mono text-sm text-text tabular">
+                {missing ? t.browser.precip.noData : formatWithUnit(LAYERS[layer], value)}
+                {classes && !missing ? (
+                  <span className="ml-1.5 font-sans text-[11px] text-muted" title={`${low} / ${high} ${LAYERS[layer].unit}`}>
+                    {t.map.classes[valueClass(layer, value)]}
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+      <p className="mt-0.5 text-[11px] text-muted">{caption}</p>
+    </div>
+  );
+}
+
+const RATING_TEXT: Readonly<Record<Rating, string>> = { good: "text-good", fair: "text-fair", poor: "text-poor" };
+
+/** Crop score view: the hovered cell's score, what holds it back and the values behind it. */
+function ScoreTooltip({ hover, field }: { readonly hover: Hover; readonly field: ScoreField }) {
+  const score = field.scores[hover.index];
+  if (score === undefined || Number.isNaN(score)) return null;
+  const rating: Rating = score >= RATING_THRESHOLDS.good ? "good" : score >= RATING_THRESHOLDS.fair ? "fair" : "poor";
+  const limiting = field.limiting[hover.index];
+  return (
+    <div aria-hidden="true" style={{ transform: tooltipTransform(hover) }} className={`${TOOLTIP_CLASS} max-w-64`}>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+        {t.map.score.title(t.common.crops[field.crop])}
+      </p>
+      <p className="font-mono text-sm text-text tabular">
+        {Math.round(score)}
+        <span className="text-xs text-muted">{t.map.score.outOf100}</span>
+        <span className={`ml-2 font-sans text-xs font-medium ${RATING_TEXT[rating]}`}>{t.common.ratings[rating]}</span>
+      </p>
+      <p className="text-[11px] text-text">
+        {limiting ? t.map.score.limitedBy(t.common.layers[limiting]) : t.map.score.allWithin}
+      </p>
+      <dl className="mt-1 grid grid-cols-[auto_auto] gap-x-3 border-t border-line pt-1 text-[11px]">
+        {FACTOR_ORDER.map((id) => {
+          const value = field.values[id][hover.index];
+          return (
+            <div key={id} className="contents">
+              <dt className="text-muted">{t.common.layers[id]}</dt>
+              <dd className="text-right font-mono text-text tabular">
+                {Number.isNaN(value) ? t.browser.precip.noData : formatWithUnit(LAYERS[id], value)}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+      <p className="mt-1 text-[11px] leading-snug text-muted">{t.map.score.source}</p>
     </div>
   );
 }
@@ -971,7 +1223,7 @@ function LoadNotice({ kind, onDismiss }: { readonly kind: NoticeKind; readonly o
   return (
     <div
       role="alert"
-      className="absolute left-3 top-3 z-[5] flex w-80 max-w-[calc(100%-1.5rem)] items-start gap-2 rounded-lg border border-line-strong bg-surface-2 py-1.5 pl-3 pr-1 shadow-lg shadow-black/40 lg:left-[calc(var(--tl-browser-w)+1.5rem)]"
+      className="absolute left-[calc(var(--tl-rail-w)+1rem)] top-2 z-[5] flex w-80 max-w-[calc(100%-var(--tl-rail-w)-1.5rem)] items-start gap-2 rounded-lg border border-line-strong bg-surface-2 py-1.5 pl-3 pr-1 shadow-lg shadow-black/40 lg:left-[calc(var(--tl-rail-w)+var(--tl-browser-w)+2rem)] lg:top-3"
     >
       <CloudOff aria-hidden="true" className="mt-2 size-4 shrink-0 text-fair" strokeWidth={1.75} />
       <div className="min-w-0 flex-1 py-1">
