@@ -16,6 +16,9 @@ export const chrome = {
     signOut: "Sign out",
     home: "Home",
     theme: "Toggle theme",
+    menu: "Menu",
+    language: "Language",
+    themeLabel: "Theme",
   },
   ribbon: {
     label: "Workspace tools",
@@ -26,23 +29,24 @@ export const chrome = {
     },
     tools: {
       pan: "Pan",
-      square: "Square",
+      square: "Area",
       edit: "Edit",
     } satisfies Record<Tool, string>,
     toolTips: {
       pan: "Pan and rotate the map",
-      square: "Draw a square plot on the map",
+      square: "Draw an area on the map",
       edit: "Move or resize the plot corners",
     } satisfies Record<Tool, string>,
     deletePlot: "Delete",
     deletePlotTip: "Delete the plot",
     analyze: "Analyze",
     analyzing: "Analyzing",
-    analyzeTip: "Re-run the planting outlook for the plot",
+    analyzeTip: "Focus on the plot and re-run its planting outlook",
     display: "Display",
     displayTip: "Show or hide map items, legends and notes",
     focusPlot: "Focus plot",
-    focusPlotTip: "Zoom the map to the plot",
+    focusPlotTip: "Focus on the plot: zoom to it, open its results, show data only inside it and dim the rest",
+    exitFocusTip: "Leave focus and close the results (Esc)",
     threeD: "3D",
     threeDTip: "Tilt the map for a 3D view",
     resetView: "Reset view",
@@ -68,13 +72,17 @@ export const chrome = {
       analyze: "A",
     },
     hints: {
-      pan: "Drag to move the map. Press S to draw a plot.",
-      square: "Draw a square on the map, or press Enter on the focused map to place one. Esc to cancel.",
+      pan: "Drag to move the map, Shift + drag to rotate. Press S to draw a plot.",
+      square: "Draw an area on the map, or press Enter on the focused map to place one. Esc to cancel.",
       edit: "Drag the corners to reshape your plot. Esc to finish.",
     } satisfies Record<Tool, string>,
     /** Native tooltip text: description, shortcut and, when unavailable, why. */
     tooltip: (description: string, shortcut?: string, unavailable?: string): string =>
       `${description}${shortcut ? ` (${shortcut})` : ""}${unavailable ? ` - ${unavailable}` : ""}`,
+  },
+  rail: {
+    label: "Data tools",
+    plots: "Plots",
   },
   undo: {
     deleted: "Plot deleted.",
@@ -86,6 +94,8 @@ export const chrome = {
     zoomOut: "Zoom out",
     resetNorth: "Reset north",
     home: "Reset view",
+    timeline: "Timeline",
+    timelineUnavailable: "Timeline (turn a layer on to use it)",
     goTo: {
       button: "Go to",
       title: "Go to",

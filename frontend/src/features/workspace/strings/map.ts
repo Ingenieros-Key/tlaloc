@@ -2,16 +2,16 @@
 export const map = {
   regionLabel: "Map of El Salvador",
   canvasLabel:
-    "Interactive map. Arrow keys pan, plus and minus zoom. With the Square tool selected, press Enter to place a plot at the map centre.",
+    "Interactive map. Arrow keys pan, Shift plus arrow keys rotate and tilt, plus and minus zoom. With the Area tool selected, press Enter to place a plot at the map centre.",
   loading: "Loading map…",
   notices: {
     tiles: {
       title: "Some map tiles could not load",
-      body: "The basemap may be incomplete. Sample data layers still work.",
+      body: "The basemap may be incomplete. Data layers still work.",
     },
     style: {
       title: "The basemap could not load",
-      body: "Showing a plain background instead. Sample data, drawing and analysis still work.",
+      body: "Showing a plain background instead. Data layers, drawing and analysis still work.",
     },
     slow: {
       title: "The map is taking a long time to load",
@@ -28,7 +28,23 @@ export const map = {
     boundary: "Boundary: geoBoundaries, © OpenStreetMap contributors",
     gibs: "Imagery: NASA GIBS / ESDIS",
   },
+  dryDay: (max: string) => `No rain this day · max ${max} mm`,
+  plotReading: (day: string) => `on ${day}`,
   tooltip: {
     outsideRange: "Outside filter range",
+    powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,
+  },
+  compare: {
+    divider: (left: string, right: string) => `Divider between ${left} (left) and ${right} (right)`,
+    dividerHint: "Drag, or use the arrow keys, to move the divider",
+  },
+  /** Blend view classes, low to high. */
+  classes: ["Low", "Mid", "High"],
+  score: {
+    title: (crop: string) => `${crop} outlook`,
+    outOf100: "/100",
+    limitedBy: (factor: string) => `Held back by ${factor.toLowerCase()}`,
+    allWithin: "Every factor is in its ideal range",
+    source: "NASA POWER, last 12 months. Soil condition is simulated.",
   },
 } as const;

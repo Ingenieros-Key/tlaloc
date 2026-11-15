@@ -1,13 +1,22 @@
 import type { Feature, Polygon } from "geojson";
 
-/** Data layers the user can inspect. Order here is display order in the Browser. */
-export type LayerId = "humidity" | "rain" | "soil";
+/** Layers drawn from the simulated sample grid; these feed the crop assessment. */
+export type SampleLayerId = "humidity" | "rain" | "soil";
+
+/** Data layers shown in the Browser and on the map. All live NASA POWER data. */
+export type LayerId = "precip" | "temp" | "humidity" | "moisture";
+
+/** What the crop outlook scores. Each comes from NASA POWER or, failing that, the sample grid. */
+export type FactorId = "temp" | "humidity" | "rain" | "soil";
+
+/** Any layer with a definition: the visible layers plus the factors behind the crop outlook. */
+export type AnyLayerId = SampleLayerId | LayerId | FactorId;
 
 export type Rgba = readonly [number, number, number, number];
 
 export type LayerDef = {
-  readonly id: LayerId;
-  /** Physical domain of the sample values: [min, max]. */
+  readonly id: AnyLayerId;
+  /** Physical domain of the values: [min, max]. */
   readonly domain: readonly [number, number];
   readonly unit: string;
   /** Decimal places when formatting values. */
@@ -29,8 +38,36 @@ export type GridCell = {
   /** Closed ring, [lng, lat][] — first point repeated at end. */
   readonly polygon: readonly (readonly [number, number])[];
   readonly center: readonly [number, number];
-  readonly values: Readonly<Record<LayerId, number>>;
+  readonly values: Readonly<Record<SampleLayerId, number>>;
 };
+
+/** One cell of the drawn data grid. Geometry only; values come from a `DataField`. */
+export type FieldCell = {
+  readonly id: number;
+  /** Closed ring, [lng, lat][]. */
+  readonly polygon: readonly (readonly [number, number])[];
+  readonly center: readonly [number, number];
+};
+
+/**
+ * Values to draw on a fixed set of cells: `values[i]` belongs to `cells[i]`, NaN = no data.
+ * `version` changes whenever the values do, so deck.gl only recomputes colors, never geometry.
+ */
+export type DataField = {
+  readonly cells: readonly FieldCell[];
+  readonly values: Float32Array;
+  readonly version: number;
+};
+
+/** How the active layer is drawn. */
+export type DataStyle = "hexagons" | "heatmap";
+
+/**
+ * What the map draws. "single": one layer. "compare": two layers either side of a divider.
+ * "blend": two layers as one color from a 3 × 3 matrix. "columns": one layer as height, another as
+ * color. "score": the crop outlook for every cell.
+ */
+export type ViewMode = "single" | "compare" | "blend" | "columns" | "score";
 
 export type Tool = "pan" | "square" | "edit";
 
@@ -42,6 +79,8 @@ export type DisplayKey =
   | "labels"
   | "tooltips"
   | "pin"
+  | "plotLabel"
+  | "timeline"
   | "navBar"
   | "legends"
   | "limiting";
@@ -61,19 +100,23 @@ export type PlotSummary = {
   readonly centroid: readonly [number, number];
 };
 
-export type CropId = "corn" | "beans" | "sorghum";
+export type CropId = "corn" | "beans" | "sorghum" | "sugarcane";
 
 export type Rating = "good" | "fair" | "poor";
 
 export type FactorScore = {
-  readonly layer: LayerId;
+  readonly layer: FactorId;
   /** Mean sampled value over the plot, in layer units. */
   readonly value: number;
   /** 0..100: how close the value is to the crop's ideal band. */
   readonly score: number;
   /** Where the value sits relative to the crop's ideal band. */
   readonly position: "below" | "within" | "above";
+  /** Where the value came from: NASA POWER, or the simulated sample grid. */
+  readonly source: FactorSource;
 };
+
+export type FactorSource = "nasa" | "sample";
 
 export type CropAssessment = {
   readonly crop: CropId;
@@ -83,7 +126,7 @@ export type CropAssessment = {
   /** Same order as LAYER_ORDER. */
   readonly factors: readonly FactorScore[];
   /** The factor with the lowest score (null when every factor is within its ideal band). */
-  readonly limiting: LayerId | null;
+  readonly limiting: FactorId | null;
 };
 
 export type Assessment =

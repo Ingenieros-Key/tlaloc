@@ -4,6 +4,7 @@ import { Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
+import type { Planting } from "../data/rotation";
 import type { PlotFeature } from "../types";
 
 const s = t.chrome.undo;
@@ -11,16 +12,21 @@ const s = t.chrome.undo;
 /** How long the undo offer stays up after a plot is deleted. */
 const UNDO_WINDOW_MS = 8_000;
 
-/** Short-lived "Plot deleted · Undo" offer shown whenever the plot is cleared. */
-export function PlotUndoToast() {
-  const { plot } = useWorkspace();
-  const dispatch = useWorkspaceDispatch();
-  const [previous, setPrevious] = useState<PlotFeature | null>(plot);
-  const [deleted, setDeleted] = useState<PlotFeature | null>(null);
+type Kept = { readonly plot: PlotFeature | null; readonly planting: Planting | null };
 
-  if (plot !== previous) {
-    setPrevious(plot);
-    setDeleted(plot === null ? previous : null);
+/**
+ * Short-lived "Plot deleted · Undo" offer shown whenever the plot is cleared. Undo also brings back
+ * the farmer's last planting, which is deleted with the plot.
+ */
+export function PlotUndoToast() {
+  const { plot, planting } = useWorkspace();
+  const dispatch = useWorkspaceDispatch();
+  const [previous, setPrevious] = useState<Kept>({ plot, planting });
+  const [deleted, setDeleted] = useState<Kept | null>(null);
+
+  if (plot !== previous.plot || planting !== previous.planting) {
+    setPrevious({ plot, planting });
+    if (plot !== previous.plot) setDeleted(plot === null && previous.plot ? previous : null);
   }
 
   useEffect(() => {
@@ -37,7 +43,8 @@ export function PlotUndoToast() {
           <button
             type="button"
             onClick={() => {
-              dispatch({ type: "setPlot", plot: deleted });
+              if (deleted.plot) dispatch({ type: "setPlot", plot: deleted.plot });
+              if (deleted.planting) dispatch({ type: "setPlanting", planting: deleted.planting });
               setDeleted(null);
             }}
             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md px-2 font-medium text-accent transition-colors duration-150 hover:bg-accent/10"

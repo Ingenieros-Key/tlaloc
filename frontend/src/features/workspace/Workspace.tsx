@@ -1,16 +1,20 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { QueryProvider } from "@/lib/query";
 import { useEffect, useRef, type ReactNode } from "react";
 import { NavBar } from "./chrome/NavBar";
 import { PlotUndoToast } from "./chrome/PlotUndoToast";
+import { RotationLanes } from "./chrome/RotationLanes";
+import { TimelineDock } from "./chrome/TimelineDock";
 import { Ribbon } from "./chrome/Ribbon";
+import { ToolRail } from "./chrome/ToolRail";
 import { TopBar } from "./chrome/TopBar";
 import { DRAWER_QUERY, useMediaQuery } from "./hooks/useMediaQuery";
 import { AnalysisAnnouncer } from "./panels/AnalysisAnnouncer";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { InspectorPanel } from "./panels/InspectorPanel";
-import { WorkspaceProvider, useWorkspace, useWorkspaceDispatch, type PanelId } from "./store";
+import { WorkspaceProvider, inspectorVisible, lanesVisible, useWorkspace, useWorkspaceDispatch, type PanelId } from "./store";
 import { t } from "./strings";
 
 /** MapLibre/deck.gl touch `window`, so the map is client-only and code-split. */
@@ -22,13 +26,15 @@ const MapView = dynamic(() => import("./map/MapView").then((m) => m.MapView), {
 /** The Fusion-style workspace: top bar, tool ribbon, map canvas with floating Browser/Inspector. */
 export function Workspace() {
   return (
-    <WorkspaceProvider>
-      <div lang="en" className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
-        <TopBar />
-        <Ribbon />
-        <Canvas />
-      </div>
-    </WorkspaceProvider>
+    <QueryProvider>
+      <WorkspaceProvider>
+        <div lang="en" className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
+          <TopBar />
+          <Ribbon />
+          <Canvas />
+        </div>
+      </WorkspaceProvider>
+    </QueryProvider>
   );
 }
 
@@ -37,15 +43,21 @@ export function Workspace() {
  * inert to keep keyboard focus out of content that cannot be seen.
  */
 function Canvas() {
-  const { panels, display } = useWorkspace();
+  const state = useWorkspace();
+  const { panels, display } = state;
   const drawerLayout = useMediaQuery(DRAWER_QUERY);
   const covered = drawerLayout && (panels.browser || panels.inspector);
 
   return (
-    <main id="workspace-canvas" className="relative min-h-0 flex-1 overflow-hidden">
+    <main
+      id="workspace-canvas"
+      data-inspector={inspectorVisible(state) ? "shown" : "hidden"}
+      className="relative min-h-0 flex-1 overflow-hidden"
+    >
       <div className="absolute inset-0" data-shortcuts="map" inert={covered}>
         <MapView />
       </div>
+      <ToolRail inert={covered} />
       <Drawers drawerLayout={drawerLayout} />
       <AnalysisAnnouncer />
       <div
@@ -53,6 +65,8 @@ function Canvas() {
         className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center px-4"
       >
         <PlotUndoToast />
+        {/* The plan lanes take the timeline's place while they are open. */}
+        {lanesVisible(state) ? <RotationLanes /> : display.timeline ? <TimelineDock /> : null}
         {display.navBar ? <NavBar /> : null}
       </div>
     </main>
@@ -60,9 +74,11 @@ function Canvas() {
 }
 
 function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
-  const { panels } = useWorkspace();
+  const state = useWorkspace();
+  const { panels } = state;
   const dispatch = useWorkspaceDispatch();
   const anyOpen = panels.browser || panels.inspector;
+  const showInspector = inspectorVisible(state);
 
   useEffect(() => {
     if (!anyOpen) return;
@@ -94,39 +110,42 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
         panel="browser"
         open={panels.browser}
         drawerLayout={drawerLayout}
+        closedAtLg={state.collapsed.browser}
       >
         <BrowserPanel />
       </Dock>
-      <Dock
-        side="right"
-        panel="inspector"
-        open={panels.inspector}
-        drawerLayout={drawerLayout}
-      >
-        <InspectorPanel />
-      </Dock>
+      {showInspector ? (
+        <Dock side="right" panel="inspector" open={panels.inspector} drawerLayout={drawerLayout}>
+          <InspectorPanel />
+        </Dock>
+      ) : null}
     </>
   );
 }
 
 /**
  * lg+: panel floats over the map at a fixed width. Below lg: off-canvas drawer toggled from the
- * top bar, closed with Escape or the scrim. Opening a drawer moves focus to its heading; closing it
+ * tool rail (left) or the top bar (right), closed with Escape or the scrim. Opening a drawer moves focus to its heading; closing it
  * returns focus to its top-bar toggle unless an in-panel action already moved focus elsewhere.
  * The dock always spans the full height and lets clicks through; the panel inside grows into it
  * and slides down to its header when collapsed (see `Panel`), so the map stays usable below it.
+ * On a phone (below sm) the right dock is a bottom sheet instead of a side drawer, so the plot stays
+ * in view above the results.
  */
 function Dock({
   side,
   panel,
   open,
   drawerLayout,
+  closedAtLg = false,
   children,
 }: {
   readonly side: "left" | "right";
   readonly panel: PanelId;
   readonly open: boolean;
   readonly drawerLayout: boolean;
+  /** lg and up: the panel is closed (the tool rail's flyout), not merely folded. */
+  readonly closedAtLg?: boolean;
   readonly children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -150,15 +169,19 @@ function Dock({
   }, [open, drawerLayout]);
 
   const width = side === "left" ? "w-[var(--tl-browser-w)]" : "w-[var(--tl-inspector-w)]";
-  const position = side === "left" ? "left-0 lg:left-3" : "right-0 lg:right-3";
-  const hidden = side === "left" ? "max-lg:-translate-x-full" : "max-lg:translate-x-full";
+  // The left panel is the tool rail's flyout: at lg it sits beside the rail (12px inset, 8px gap).
+  const position = side === "left" ? "left-0 lg:left-[calc(var(--tl-rail-w)+1.25rem)]" : "right-0 lg:right-3";
+  const hidden =
+    side === "left" ? "max-lg:-translate-x-full" : "max-lg:translate-x-full max-sm:translate-x-0 max-sm:translate-y-full";
+  const sheet =
+    side === "right" ? "max-sm:inset-x-0 max-sm:top-auto max-sm:h-[72dvh] max-sm:w-full max-sm:max-w-none" : "";
   return (
     <div
       ref={ref}
       id={`dock-${panel}`}
       className={`pointer-events-none absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:bottom-3 lg:top-3 ${width} ${position} ${
         open ? "max-lg:translate-x-0" : `${hidden} max-lg:invisible`
-      }`}
+      } ${sheet} ${closedAtLg ? "lg:hidden" : ""}`}
     >
       {children}
     </div>
