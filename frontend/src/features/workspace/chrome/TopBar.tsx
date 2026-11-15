@@ -1,93 +1,36 @@
 "use client";
 
-import { Home, Info, LogIn, LogOut, Moon, PanelLeft, PanelRight, Sun, type LucideIcon } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
+import { Info, PanelLeft, PanelRight, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
-import { getCurrentUser, signOut } from "aws-amplify/auth";
 import { t } from "../strings";
 import { useWorkspace, useWorkspaceDispatch, type PanelId } from "../store";
 import { Badge } from "../ui/Badge";
 import { IconButton } from "../ui/IconButton";
-import { AuthModal } from "@/components/ui/auth-modal";
-import { applyTheme, readStoredTheme, type Theme } from "@/lib/theme";
-import "@/lib/amplify";
+import { Brand } from "@/components/ui/brand";
+import { NavLinks } from "@/components/ui/nav-links";
+import { AuthControl } from "@/components/ui/auth-control";
 
 const s = t.chrome.topBar;
 
-const barBtn =
-  "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line px-3 text-sm font-medium text-text transition-colors duration-150 hover:border-line-strong hover:bg-surface-3 max-sm:size-11 max-sm:px-0";
-
-/** App bar: brand, project name, sample-data notice, drawer toggles (below lg) and sign-in. */
+/** App bar: shared site nav (brand + links + auth), project name, sample-data notice, drawer toggles. */
 export function TopBar() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [auth, setAuth] = useState<"loading" | "in" | "out">("loading");
-  const [theme, setTheme] = useState<Theme>("dark");
-
-  const refresh = () =>
-    getCurrentUser().then(() => setAuth("in")).catch(() => setAuth("out"));
-
-  useEffect(() => {
-    refresh();
-    const saved = readStoredTheme();
-    setTheme(saved);
-    applyTheme(saved);
-  }, []);
-
-  const toggleTheme = () =>
-    setTheme((p) => {
-      const next: Theme = p === "dark" ? "light" : "dark";
-      applyTheme(next);
-      return next;
-    });
-
   return (
-    <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-2 border-b border-line bg-bg px-3">
-      <div className="flex shrink-0 items-center gap-2">
-        <Image src="/favicon.svg" alt="" width={22} height={22} className="size-[22px]" unoptimized />
-        <h1 className="font-display text-base font-semibold tracking-wide text-text max-[359px]:sr-only">{t.common.appName}</h1>
-      </div>
-      <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line sm:block" />
-      <p className="hidden min-w-0 truncate text-sm text-muted sm:block">
+    <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-3 border-b border-line bg-bg px-3">
+      <Brand />
+      <NavLinks className="max-lg:hidden" />
+      <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line xl:block" />
+      <p className="hidden min-w-0 truncate text-sm text-muted xl:block">
         <span className="sr-only">{s.projectLabel} </span>
         {s.projectName}
       </p>
       <SampleDataNotice />
-      <div className="ml-auto flex shrink-0 items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <div className="flex items-center lg:hidden">
           <DrawerToggle panel="browser" other="inspector" icon={PanelLeft} label={s.openLayers} />
           <DrawerToggle panel="inspector" other="browser" icon={PanelRight} label={s.openResults} />
         </div>
-        <Link href="/" className={`${barBtn} max-sm:px-0 sm:px-0 sm:w-9`} title={s.home} aria-label={s.home}>
-          <Home aria-hidden="true" className="size-4" strokeWidth={1.75} />
-          <span className="sr-only">{s.home}</span>
-        </Link>
-        <button type="button" onClick={toggleTheme} className={`${barBtn} sm:px-0 sm:w-9`} title={s.theme} aria-label={s.theme}>
-          {theme === "dark" ? (
-            <Sun aria-hidden="true" className="size-4" strokeWidth={1.75} />
-          ) : (
-            <Moon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-          )}
-        </button>
-        {auth === "in" ? (
-          <button
-            type="button"
-            onClick={() => signOut().then(() => setAuth("out")).catch(() => setAuth("out"))}
-            className={barBtn}
-            title={s.signOut}
-            aria-label={s.signOut}
-          >
-            <LogOut aria-hidden="true" className="size-4 sm:hidden" strokeWidth={1.75} />
-            <span className="max-sm:sr-only">{s.signedIn}</span>
-          </button>
-        ) : (
-          <button type="button" onClick={() => setModalOpen(true)} className={barBtn}>
-            <LogIn aria-hidden="true" className="size-4 sm:hidden" strokeWidth={1.75} />
-            <span className="max-sm:sr-only">{s.signIn}</span>
-          </button>
-        )}
+        <AuthControl menuExtras />
       </div>
-      <AuthModal open={modalOpen} onClose={() => setModalOpen(false)} lang="en" onAuthed={refresh} />
     </header>
   );
 }

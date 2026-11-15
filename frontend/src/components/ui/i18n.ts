@@ -35,6 +35,52 @@ export const landingCopy: Record<Lang, {
   },
 };
 
+export const navCopy: Record<Lang, {
+  home: string;
+  about: string;
+  workspace: string;
+  signIn: string;
+  welcome: (name?: string) => string;
+  viewProfile: string;
+  signOut: string;
+  theme: string;
+  language: string;
+}> = {
+  en: {
+    home: "Home",
+    about: "About us",
+    workspace: "Workspace",
+    signIn: "Sign in",
+    welcome: (name) => (name ? `Welcome, ${name}` : "Welcome"),
+    viewProfile: "View profile",
+    signOut: "Sign out",
+    theme: "Theme",
+    language: "Language",
+  },
+  es: {
+    home: "Inicio",
+    about: "Nosotros",
+    workspace: "Workspace",
+    signIn: "Iniciar sesión",
+    welcome: (name) => (name ? `Bienvenido, ${name}` : "Bienvenido"),
+    viewProfile: "Ver perfil",
+    signOut: "Cerrar sesión",
+    theme: "Tema",
+    language: "Idioma",
+  },
+};
+
+export const aboutCopy: Record<Lang, { title: string; body: string }> = {
+  en: {
+    title: "Our story",
+    body: "Coming soon.",
+  },
+  es: {
+    title: "Nuestra historia",
+    body: "Próximamente.",
+  },
+};
+
 export const authCopy: Record<Lang, {
   signInTitle: string;
   signInSub: string;
