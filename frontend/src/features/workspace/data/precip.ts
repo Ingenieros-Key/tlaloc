@@ -8,11 +8,35 @@ import {
   type PowerDate,
   type PowerLocation,
 } from "@/lib/nasa-power";
-import type { FieldCell } from "../types";
+import type { FieldCell, LayerId } from "../types";
 import { getSampleGrid } from "./sample-grid";
 
-/** Live precipitation layer: NASA POWER corrected precipitation, mm per day. */
+/** NASA POWER corrected precipitation, mm per day. */
 export const PRECIP_PARAMETER = "PRECTOTCORR";
+/** Daily mean and maximum air temperature at 2 m, °C. */
+export const TEMP_PARAMETER = "T2M";
+export const TEMP_MAX_PARAMETER = "T2M_MAX";
+/** Relative humidity at 2 m, %. */
+export const HUMIDITY_PARAMETER = "RH2M";
+/** Root-zone soil wetness, 0–1. */
+export const MOISTURE_PARAMETER = "GWETROOT";
+
+/**
+ * How each Browser layer maps to NASA POWER: its parameter, whether a period adds its days up
+ * (rainfall) or averages them (everything else), and a factor applied to every value (soil
+ * wetness 0–1 is shown as a percentage).
+ */
+export const LAYER_SOURCES: Readonly<
+  Record<LayerId, { readonly parameter: string; readonly aggregate: "sum" | "mean"; readonly scale: number }>
+> = {
+  precip: { parameter: PRECIP_PARAMETER, aggregate: "sum", scale: 1 },
+  temp: { parameter: TEMP_PARAMETER, aggregate: "mean", scale: 1 },
+  humidity: { parameter: HUMIDITY_PARAMETER, aggregate: "mean", scale: 1 },
+  moisture: { parameter: MOISTURE_PARAMETER, aggregate: "mean", scale: 100 },
+};
+
+/** A day hotter than this (daily maximum, °C) counts as a heat-stress day for corn and beans. */
+export const HOT_DAY_C = 35;
 
 /** Quick timeframes, in days, each ending at the newest day. */
 export const PRECIP_PRESETS = [7, 30, 90, 365] as const;
@@ -72,6 +96,32 @@ export type PrecipFrames = {
   readonly values: readonly Float32Array[];
 };
 
+/** Rainfall columns never scale to less than this, so a nearly dry timeframe does not tower. */
+const MIN_RAIN_HEIGHT_MM = 5;
+
+const heightDomains = new WeakMap<PrecipFrames, readonly [number, number]>();
+
+/**
+ * The values that map to no height and to full height in the Columns view. Rainfall runs from 0 to
+ * the wettest cell of the loaded timeframe: against the layer's fixed 0 to 40 mm, an ordinary day
+ * of a few millimetres would be flat. Because it spans the whole timeframe, heights stay comparable
+ * from day to day while it plays. Every other layer uses its own domain.
+ */
+export function heightDomain(
+  layer: LayerId,
+  domain: readonly [number, number],
+  frames: PrecipFrames | null,
+): readonly [number, number] {
+  if (LAYER_SOURCES[layer].aggregate !== "sum" || !frames) return domain;
+  const cached = heightDomains.get(frames);
+  if (cached) return cached;
+  let max = MIN_RAIN_HEIGHT_MM;
+  for (const frame of frames.values) for (const value of frame) if (value > max) max = value;
+  const result = [0, Math.min(domain[1], Math.ceil(max))] as const;
+  heightDomains.set(frames, result);
+  return result;
+}
+
 type Weight = readonly [point: number, weight: number];
 
 /** Index pair around `v` on a sorted axis and the fraction between them; clamped at the ends. */
@@ -108,27 +158,71 @@ function bilinearWeights(grid: readonly LngLat[], targets: readonly LngLat[]): r
   });
 }
 
-/** POWER regional request behind the map: every grid cell over El Salvador for the window. */
-export function precipRegionalQuery(window: PrecipWindow) {
-  const options = powerRegionalQuery({ parameters: [PRECIP_PARAMETER], bbox: EL_SALVADOR_BBOX, ...window });
+/** POWER regional request behind a map layer: every grid cell over El Salvador for the window. */
+export function layerRegionalQuery(layer: LayerId, window: PrecipWindow) {
+  const parameter = LAYER_SOURCES[layer].parameter;
+  const options = powerRegionalQuery({ parameters: [parameter], bbox: EL_SALVADOR_BBOX, ...window });
   const settled = window.end < addDays(toPowerDate(new Date()), -SETTLED_AFTER_DAYS);
   return settled ? { ...options, staleTime: Infinity } : options;
 }
 
-/** POWER point request behind the detail chart (the cell containing the point). */
-export function precipPointQuery([lng, lat]: LngLat, window: PrecipWindow) {
-  return powerPointQuery({ parameters: [PRECIP_PARAMETER], longitude: lng, latitude: lat, ...window });
+/** POWER point request for one or more parameters at a point (the cell containing it). */
+export function pointQuery([lng, lat]: LngLat, window: PrecipWindow, parameters: readonly string[]) {
+  return powerPointQuery({ parameters: [...parameters].sort(), longitude: lng, latitude: lat, ...window });
 }
 
 /**
- * Daily precipitation on the hexagon grid, from a regional POWER answer. POWER's native
+ * Each hexagon's value over a whole window, from a regional POWER answer: the layer's mean, or for
+ * rainfall its total scaled to `fullDays` (so days not published yet do not lower a yearly total).
+ * Aggregated at POWER's grid points first, then interpolated like the daily frames. NaN = no data.
+ */
+export function buildLayerAggregate(
+  data: readonly PowerLocation[],
+  layer: LayerId,
+  fullDays: number,
+): Float32Array {
+  const { parameter, aggregate, scale } = LAYER_SOURCES[layer];
+  const points = data.map((location) => {
+    let sum = 0;
+    let days = 0;
+    for (const value of Object.values(location.series[parameter] ?? {})) {
+      if (value === null) continue;
+      sum += value;
+      days += 1;
+    }
+    if (days === 0) return null;
+    return (aggregate === "sum" ? (sum * fullDays) / days : sum / days) * scale;
+  });
+  const grid = getSampleGrid();
+  const weights = bilinearWeights(
+    data.map((location): LngLat => [location.longitude, location.latitude]),
+    grid.map((cell) => cell.center),
+  );
+  const out = new Float32Array(grid.length);
+  weights.forEach((hexWeights, h) => {
+    let sum = 0;
+    let total = 0;
+    for (const [point, w] of hexWeights) {
+      const value = points[point];
+      if (value === null) continue;
+      sum += value * w;
+      total += w;
+    }
+    out[h] = total > 0 ? sum / total : NaN;
+  });
+  return out;
+}
+
+/**
+ * A layer's daily values on the hexagon grid, from a regional POWER answer. POWER's native
  * grid is MERRA-2 / GEOS-IT at 0.5° × 0.625° (about 55 × 68 km, ~20 cells over the country), so each
  * hexagon is interpolated bilinearly from the surrounding cell centres: smoother, but no more
  * detailed than the source. Trailing days nobody has published yet (a lag longer than assumed) are
  * dropped.
  */
-export function buildPrecipFrames(data: readonly PowerLocation[]): PrecipFrames {
-  const series = data.map((location) => location.series[PRECIP_PARAMETER] ?? {});
+export function buildLayerFrames(data: readonly PowerLocation[], layer: LayerId): PrecipFrames {
+  const { parameter, scale } = LAYER_SOURCES[layer];
+  const series = data.map((location) => location.series[parameter] ?? {});
   // POWER answers with every day of the request (fill values included), so its keys are the dates.
   const dates = Object.keys(series[0] ?? {}).sort();
   while (dates.length > 0 && series.every((s) => s[dates[dates.length - 1]] == null)) dates.pop();
@@ -147,7 +241,7 @@ export function buildPrecipFrames(data: readonly PowerLocation[]): PrecipFrames 
       for (const [point, w] of hexWeights) {
         const value = day[point];
         if (value === null) continue;
-        sum += value * w;
+        sum += value * scale * w;
         total += w;
       }
       frame[h] = total > 0 ? sum / total : NaN;

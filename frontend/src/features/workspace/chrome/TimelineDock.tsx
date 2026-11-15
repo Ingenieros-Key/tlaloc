@@ -1,11 +1,19 @@
 "use client";
 
-import { addDays, dateRange, summarizeDaily, type PowerDate } from "@/lib/nasa-power";
+import { addDays, dateRange, type PowerDate } from "@/lib/nasa-power";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Pause, Play } from "lucide-react";
 import { useId, useState, type CSSProperties } from "react";
-import { PRECIP_DEFAULT_POINT, PRECIP_PARAMETER, precipPointQuery, type PrecipWindow } from "../data/precip";
-import { formatDay } from "../panels/format";
+import {
+  HOT_DAY_C,
+  LAYER_SOURCES,
+  PRECIP_DEFAULT_POINT,
+  TEMP_MAX_PARAMETER,
+  pointQuery,
+  type PrecipWindow,
+} from "../data/precip";
+import { LAYERS } from "../layers";
+import { formatDay, formatWithUnit } from "../panels/format";
 import { RetryButton } from "../panels/RetryButton";
 import styles from "../panels/sliders.module.css";
 import {
@@ -30,49 +38,61 @@ function roundCoord(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
-function mm(value: number): string {
-  return `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })} mm`;
-}
 
 /**
- * Timeline for the precipitation layer, docked above the nav bar: the day on the map, playback and
- * speed (timeframe mode), and the daily totals at the pin (else the plot centre, else San Salvador)
- * drawn as bars behind the scrubber, with the period total and wettest day underneath.
+ * Timeline for the active NASA layer, docked above the nav bar: the day on the map, playback and
+ * speed (timeframe mode), and the daily values at the pin (else the plot centre, else San Salvador)
+ * drawn as bars behind the scrubber. Underneath: rainfall's period total and wettest day, or another
+ * layer's period mean and range (plus heat-stress days for temperature).
  */
 export function TimelineDock() {
   const state = useWorkspace();
-  const { activeLayer, precip, precipMode, precipPlaying, precipSpeed, pin, plotSummary } = state;
+  const { activeLayer, layerData, precipMode, precipPlaying, precipSpeed, pin, plotSummary } = state;
   const dispatch = useWorkspaceDispatch();
   const [hovered, setHovered] = useState<number | null>(null);
   const sliderId = useId();
   const speedId = useId();
 
-  const dates = precip.status === "ready" ? precip.frames.dates : [];
-  const last = lastDay(precip);
+  const dates = layerData.status === "ready" ? layerData.frames.dates : [];
+  const last = lastDay(layerData);
   const newest = dates[last] ?? "";
   const latestMode = precipMode === "latest";
   const window: PrecipWindow = latestMode
     ? { start: newest && addDays(newest, -(LATEST_CONTEXT_DAYS - 1)), end: newest }
     : { start: dates[0] ?? "", end: newest };
   const target = pin ?? plotSummary?.centroid ?? PRECIP_DEFAULT_POINT;
+  const source = LAYER_SOURCES[activeLayer ?? "precip"];
+  // Temperature also asks for the daily maximum, to count heat-stress days.
+  const parameters = activeLayer === "temp" ? [source.parameter, TEMP_MAX_PARAMETER] : [source.parameter];
   const point = useQuery({
-    ...precipPointQuery([roundCoord(target[0]), roundCoord(target[1])], window),
-    enabled: activeLayer === "precip" && dates.length > 0,
+    ...pointQuery([roundCoord(target[0]), roundCoord(target[1])], window, parameters),
+    enabled: activeLayer !== null && dates.length > 0,
     // Keeps the previous point's bars while a moved pin loads.
     placeholderData: keepPreviousData,
   });
 
-  if (activeLayer !== "precip" || precip.status !== "ready" || dates.length === 0) return null;
+  if (activeLayer === null || layerData.status !== "ready" || dates.length === 0) return null;
 
   const s = t.browser.precip;
   const day = precipDayIndex(state);
   const date = dates[day];
   const days = dateRange(window.start, window.end);
-  const series = point.data?.data.series[PRECIP_PARAMETER] ?? null;
-  const values = days.map((d) => series?.[d] ?? null);
-  const peak = Math.max(1, ...values.map((v) => v ?? 0));
+  const def = LAYERS[activeLayer];
+  const fmt = (value: number) => formatWithUnit(def, value);
+  const series = point.data?.data.series[source.parameter] ?? null;
+  const values = days.map((d) => {
+    const value = series?.[d];
+    return value === null || value === undefined ? null : value * source.scale;
+  });
+  const valid = values.filter((v): v is number => v !== null);
+  // Rainfall bars rise from 0. Averaged layers move within a narrow band (27 vs 28 °C, 60 vs 70 %),
+  // so their bars span the period's own range, padded, to make day-to-day change visible.
+  const low = valid.length > 0 ? Math.min(...valid) : def.domain[0];
+  const high = valid.length > 0 ? Math.max(...valid) : def.domain[1];
+  const pad = Math.max((high - low) * 0.6, 10 ** -def.precision);
+  const base = source.aggregate === "sum" ? 0 : Math.max(def.domain[0], low - pad);
+  const peak = source.aggregate === "sum" ? Math.max(1, high) : high + pad * 0.15;
   const place = t.browser.precip.places[pin ? "pin" : plotSummary ? "plot" : "default"];
-  const summary = series ? summarizeDaily(series) : null;
   const short = days[0].slice(0, 4) === days[days.length - 1].slice(0, 4);
   const pendingPoint = point.isFetching && (point.isPlaceholderData || !point.data);
   const style: FillStyle = { "--pct": day / Math.max(1, last) };
@@ -81,18 +101,31 @@ export function TimelineDock() {
   let caption: string;
   if (hovered !== null && days[hovered]) {
     const value = values[hovered];
-    caption = `${formatDay(days[hovered])} · ${value === null ? s.noData : mm(value)}`;
-  } else if (summary) {
-    const wettest = summary.max ? ` · ${s.wettestShort(formatDay(summary.max.date, true))}` : "";
-    caption = `${place} · ${s.total(days.length)} ${mm(summary.total)}${wettest}`;
-  } else {
+    caption = `${formatDay(days[hovered])} · ${value === null ? s.noData : fmt(value)}`;
+  } else if (valid.length === 0) {
     caption = place;
+  } else if (source.aggregate === "sum") {
+    const total = valid.reduce((sum, v) => sum + v, 0);
+    const wettest = values.reduce<number>((best, v, i) => (v !== null && v > (values[best] ?? -1) ? i : best), 0);
+    caption = `${place} · ${s.total(days.length)} ${fmt(total)} · ${s.wettestShort(formatDay(days[wettest], true))}`;
+  } else {
+    const mean = valid.reduce((sum, v) => sum + v, 0) / valid.length;
+    const range = s.range(fmt(Math.min(...valid)), fmt(Math.max(...valid)));
+    let extra = "";
+    if (activeLayer === "temp") {
+      const maxima = Object.entries(point.data?.data.series[TEMP_MAX_PARAMETER] ?? {}).filter(
+        ([d, v]) => v !== null && d >= days[0] && d <= days[days.length - 1],
+      );
+      const hot = maxima.filter(([, v]) => (v as number) > HOT_DAY_C).length;
+      extra = ` · ${s.hotDays(hot, HOT_DAY_C)}`;
+    }
+    caption = `${place} · ${s.mean(days.length)} ${fmt(mean)} · ${range}${extra}`;
   }
 
   return (
     <section
-      aria-label={s.dockLabel}
-      aria-busy={precip.refreshing || pendingPoint}
+      aria-label={s.dockLabel(t.common.layers[activeLayer])}
+      aria-busy={layerData.refreshing || pendingPoint}
       className="pointer-events-auto mb-2 w-full max-w-[600px] rounded-xl border border-line bg-surface/95 px-3 pb-2 pt-2.5 shadow-xl shadow-black/30 backdrop-blur"
     >
       <div className="flex items-center gap-2">
@@ -107,7 +140,7 @@ export function TimelineDock() {
               label={precipPlaying ? s.pause : s.play(dates.length)}
               pressed={precipPlaying}
               size="sm"
-              disabled={precip.refreshing}
+              disabled={layerData.refreshing}
               // From the last day, playback restarts at the beginning of the timeframe.
               onClick={() =>
                 dispatch({ type: "setPrecipPlaying", playing: !precipPlaying, from: day >= last ? 0 : day })
@@ -132,7 +165,7 @@ export function TimelineDock() {
             </select>
           </>
         )}
-        <span className="ml-auto text-xs text-muted">{precip.refreshing ? s.loadingRange : s.day}</span>
+        <span className="ml-auto text-xs text-muted">{layerData.refreshing ? s.loadingRange : s.day}</span>
         <output
           htmlFor={latestMode ? undefined : sliderId}
           aria-live={precipPlaying ? "off" : "polite"}
@@ -147,7 +180,7 @@ export function TimelineDock() {
         aria-hidden="true"
         className={`mt-2 flex h-8 items-end gap-px border-b border-line transition-opacity duration-200 ${
           latestMode ? "" : "px-[14px] max-lg:px-[22px]"
-        } ${pendingPoint || precip.refreshing ? "opacity-50" : ""}`}
+        } ${pendingPoint || layerData.refreshing ? "opacity-50" : ""}`}
         onMouseLeave={() => setHovered(null)}
       >
         {values.map((value, i) => {
@@ -163,7 +196,9 @@ export function TimelineDock() {
                 className={`w-full rounded-t-[1px] transition-colors duration-150 ${
                   isActive ? "bg-accent" : hovered === i ? "bg-accent/70" : "bg-accent/35"
                 }`}
-                style={{ height: value === null ? 0 : `${Math.max(3, (value / peak) * 100)}%` }}
+                style={{
+                  height: value === null ? 0 : `${Math.max(3, ((value - base) / (peak - base)) * 100)}%`,
+                }}
               />
             </div>
           );
@@ -182,7 +217,7 @@ export function TimelineDock() {
             max={last}
             step={1}
             value={day}
-            disabled={precip.refreshing}
+            disabled={layerData.refreshing}
             aria-valuetext={formatDay(date)}
             onChange={(e) => pick(Number(e.currentTarget.value))}
             className={`${styles.slider} -mt-[14px] max-lg:-mt-[22px]`}
@@ -204,10 +239,10 @@ export function TimelineDock() {
         <span className="shrink-0 font-mono tabular">{formatDay(days[days.length - 1], short)}</span>
       </div>
 
-      <ul className="sr-only" aria-label={s.chartLabel(place, formatDay(days[0]), formatDay(days[days.length - 1]))}>
+      <ul className="sr-only" aria-label={s.chartLabel(t.common.layers[activeLayer], place, formatDay(days[0]), formatDay(days[days.length - 1]))}>
         {days.map((d: PowerDate, i) => {
           const value = values[i];
-          return <li key={d}>{`${formatDay(d)}: ${value === null ? s.noData : mm(value)}`}</li>;
+          return <li key={d}>{`${formatDay(d)}: ${value === null ? s.noData : fmt(value)}`}</li>;
         })}
       </ul>
     </section>

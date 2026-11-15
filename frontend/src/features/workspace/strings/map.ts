@@ -29,10 +29,22 @@ export const map = {
     gibs: "Imagery: NASA GIBS / ESDIS",
   },
   dryDay: (max: string) => `No rain this day · max ${max} mm`,
-  millimetres: (value: string) => `${value} mm`,
   plotReading: (day: string) => `on ${day}`,
   tooltip: {
     outsideRange: "Outside filter range",
     powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,
+  },
+  compare: {
+    divider: (left: string, right: string) => `Divider between ${left} (left) and ${right} (right)`,
+    dividerHint: "Drag, or use the arrow keys, to move the divider",
+  },
+  /** Blend view classes, low to high. */
+  classes: ["Low", "Mid", "High"],
+  score: {
+    title: (crop: string) => `${crop} outlook`,
+    outOf100: "/100",
+    limitedBy: (factor: string) => `Held back by ${factor.toLowerCase()}`,
+    allWithin: "Every factor is in its ideal range",
+    source: "NASA POWER, last 12 months. Soil condition is simulated.",
   },
 } as const;

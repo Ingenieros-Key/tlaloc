@@ -8,13 +8,28 @@ import {
   type PathLayerProps,
   type PolygonLayerProps,
 } from "@deck.gl/layers";
-import { LAYERS, MUTED_CELL, rampColor } from "../layers";
-import type { DataField, DataStyle, DisplaySettings, FieldCell, LayerId, LayerSettings, Rgba } from "../types";
+import { BLEND_COLORS, LAYERS, MUTED_CELL, SCORE_SCALE, rampColor, valueClass } from "../layers";
+import type {
+  DataField,
+  DataStyle,
+  DisplaySettings,
+  FieldCell,
+  LayerId,
+  LayerSettings,
+  Rgba,
+  ViewMode,
+} from "../types";
 import { COUNTRY_RINGS } from "./geo";
 import { CELL_HIGHLIGHT, CELL_STROKE, CELL_STROKE_DARK, OUTLINE_COLOR } from "./theme";
 
 /** deck.gl layer id of the active data layer (used to filter hover picks). */
 export const DATA_LAYER_ID = "tl-data";
+/** Compare: the second layer's side of the divider. */
+export const DATA_LAYER_B_ID = "tl-data-b";
+
+/** Columns: height on screen of a cell at the top of the height layer's domain, in pixels. */
+const COLUMN_MAX_PX = 72;
+const COLUMN_ALPHA = 235;
 const OUTLINE_LAYER_ID = "tl-country-outline";
 
 type LngLat = [number, number];
@@ -24,6 +39,8 @@ const COUNTRY_PATHS: readonly LngLat[][] = COUNTRY_RINGS.map((ring) =>
 );
 
 const TRANSPARENT: Rgba = [0, 0, 0, 0];
+/** Blend colors are drawn as designed at the default layer opacity and fade below it. */
+const DEFAULT_OPACITY = 0.7;
 
 const DIM_LAYER_ID = "tl-focus-dim";
 /** Whole-world ring (Web Mercator limits) that the focus dim cuts the plot out of. */
@@ -73,12 +90,97 @@ function clipCellsToRing(cells: readonly FieldCell[], ring: readonly LngLat[]): 
   return result;
 }
 
+let wholeCache: { cells: readonly FieldCell[]; result: ClippedCell[] } | null = null;
+
+/** Every cell as an uncut piece, so whole grids and plot cut-outs draw through the same layer. */
+function wholeCells(cells: readonly FieldCell[]): ClippedCell[] {
+  if (wholeCache && wholeCache.cells === cells) return wholeCache.result;
+  const result = cells.map((cell, index) => ({
+    polygon: [cell.polygon.map(([x, y]): LngLat => [x, y])],
+    index,
+  }));
+  wholeCache = { cells, result };
+  return result;
+}
+
+/**
+ * Compare's divider on the ground: the vertical screen line through `a` (top) and `b` (bottom),
+ * and a point on its left. A straight screen line stays straight on the ground at any bearing or
+ * tilt, so cells can be cut against it in map coordinates.
+ */
+export type SplitLine = { readonly a: LngLat; readonly b: LngLat; readonly left: LngLat };
+
+/** The part of a closed convex ring where `distance` is not negative (Sutherland-Hodgman). */
+function clipRing(ring: readonly LngLat[], distance: (p: LngLat) => number): LngLat[] | null {
+  const out: LngLat[] = [];
+  for (let i = 0; i < ring.length - 1; i += 1) {
+    const p = ring[i];
+    const q = ring[i + 1];
+    const dp = distance(p);
+    const dq = distance(q);
+    if (dp >= 0) out.push(p);
+    if (dp >= 0 !== dq >= 0) {
+      const t = dp / (dp - dq);
+      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  }
+  if (out.length < 3) return null;
+  out.push(out[0]);
+  return out;
+}
+
+/**
+ * Pieces on each side of the divider. A piece the line crosses is cut in two; cells and plot
+ * cut-outs are convex, so one pass per side is exact.
+ */
+function splitPieces(
+  pieces: readonly ClippedCell[],
+  { a, b, left }: SplitLine,
+): { left: ClippedCell[]; right: ClippedCell[] } {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const cross = (p: LngLat) => dx * (p[1] - a[1]) - dy * (p[0] - a[0]);
+  const sign = cross(left) >= 0 ? 1 : -1;
+  const leftward = (p: LngLat) => sign * cross(p);
+  const rightward = (p: LngLat) => -leftward(p);
+  const result = { left: [] as ClippedCell[], right: [] as ClippedCell[] };
+  for (const piece of pieces) {
+    const ring = piece.polygon[0];
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of ring) {
+      const d = leftward(p);
+      if (d < min) min = d;
+      if (d > max) max = d;
+    }
+    if (min >= 0) result.left.push(piece);
+    else if (max <= 0) result.right.push(piece);
+    else {
+      const l = clipRing(ring, leftward);
+      const r = clipRing(ring, rightward);
+      if (l) result.left.push({ polygon: [l], index: piece.index });
+      if (r) result.right.push({ polygon: [r], index: piece.index });
+    }
+  }
+  return result;
+}
+
 /** `beforeId` is read by @deck.gl/maplibre in interleaved mode but is not part of core LayerProps. */
 type Interleaved = { readonly beforeId?: string };
 
 type DeckLayerInput = {
   /** Values of the active layer on its grid, or null while nothing is loaded. */
   readonly field: DataField | null;
+  /** Values of the second layer on the same grid (two-layer views), or null. */
+  readonly fieldB: DataField | null;
+  /** Crop scores per cell (score view), or null. */
+  readonly score: DataField | null;
+  readonly mode: ViewMode;
+  readonly secondLayer: LayerId;
+  /** Compare: where the divider is. Null draws only the active layer. */
+  readonly split: SplitLine | null;
+  /** Columns: the active layer's values at no height and at full height. */
+  readonly heightDomain: readonly [number, number];
   readonly activeLayer: LayerId | null;
   readonly layerSettings: Readonly<Record<LayerId, LayerSettings>>;
   readonly style: DataStyle;
@@ -126,6 +228,11 @@ function fillColor<T>(
   };
 }
 
+/** Metres per screen pixel at the grid's latitude. */
+function metresPerPixel(zoom: number): number {
+  return (40_075_016.686 * Math.cos((GRID_LAT * Math.PI) / 180)) / (512 * 2 ** zoom);
+}
+
 /** Side of the heatmap's weights texture, in texels (see `weightsTextureSize` below). */
 const HEATMAP_TEXTURE_SIZE = 256;
 
@@ -139,8 +246,50 @@ const GRID_LAT = 13.7;
  * a continuous surface. deck.gl caps it at 100 px, so samples separate when zoomed in very close.
  */
 function heatmapRadius(zoom: number): number {
-  const metresPerPixel = (40_075_016.686 * Math.cos((GRID_LAT * Math.PI) / 180)) / (512 * 2 ** zoom);
-  return Math.round(Math.min(100, Math.max(12, (GRID_SPACING_M / metresPerPixel) * 2.5)));
+  return Math.round(Math.min(100, Math.max(12, (GRID_SPACING_M / metresPerPixel(zoom)) * 2.5)));
+}
+
+type PieceLayerInput = {
+  readonly id: string;
+  readonly beforeId: string | undefined;
+  readonly pieces: readonly ClippedCell[];
+  readonly getFillColor: (piece: ClippedCell) => Rgba;
+  /** Everything the fill depends on, so deck.gl recolors only when it changes. */
+  readonly fillKey: readonly unknown[];
+  readonly opacity: number;
+  readonly theme: "light" | "dark";
+  readonly borders: boolean;
+  /** Columns: each piece's height as 0 to 1, and the height of 1 in metres. */
+  readonly height?: { readonly get: (piece: ClippedCell) => number; readonly scale: number; readonly key: readonly unknown[] };
+};
+
+/** Cells or cut pieces of cells, filled by `getFillColor`; flat, or extruded when `height` is set. */
+function pieceLayer({ id, beforeId, pieces, getFillColor, fillKey, opacity, theme, borders, height }: PieceLayerInput) {
+  const props: PolygonLayerProps<ClippedCell> & Interleaved = {
+    id,
+    beforeId,
+    data: pieces,
+    getPolygon: (piece) => piece.polygon,
+    filled: true,
+    stroked: borders && !height,
+    extruded: height !== undefined,
+    getElevation: height ? height.get : 0,
+    elevationScale: height ? height.scale : 1,
+    getFillColor,
+    getLineColor: withOpacity(theme === "dark" ? CELL_STROKE_DARK : CELL_STROKE, opacity),
+    lineWidthUnits: "pixels",
+    getLineWidth: 0.5,
+    lineWidthMinPixels: 0.5,
+    pickable: true,
+    autoHighlight: true,
+    highlightColor: [...CELL_HIGHLIGHT],
+    updateTriggers: {
+      getFillColor: fillKey,
+      getElevation: height ? height.key : [],
+      getLineColor: [opacity, theme],
+    },
+  };
+  return new PolygonLayer<ClippedCell>(props);
 }
 
 /**
@@ -149,6 +298,12 @@ function heatmapRadius(zoom: number): number {
  */
 export function buildDeckLayers({
   field,
+  fieldB,
+  score,
+  mode,
+  secondLayer,
+  split,
+  heightDomain,
   activeLayer,
   layerSettings,
   style,
@@ -174,7 +329,103 @@ export function buildDeckLayers({
     );
   }
 
-  if (activeLayer && field && display.data) {
+  const pieceTheme = { beforeId, theme, borders: display.borders };
+  /** What a combined view draws: the cells under the plot in focus, else the whole grid. */
+  const piecesOf = (cells: readonly FieldCell[]) => (focusRing ? clipCellsToRing(cells, focusRing) : wholeCells(cells));
+  const ringKey = focusRing ? JSON.stringify(focusRing) : "";
+
+  if (mode === "score") {
+    if (score && display.data) {
+      const { cells, values, version } = score;
+      layers.push(
+        pieceLayer({
+          ...pieceTheme,
+          id: DATA_LAYER_ID,
+          pieces: piecesOf(cells),
+          getFillColor: (piece) => {
+            const value = values[piece.index];
+            return Number.isNaN(value) ? TRANSPARENT : rampColor(SCORE_SCALE, value);
+          },
+          fillKey: [version, ringKey],
+          opacity: 1,
+        }),
+      );
+    }
+  } else if (mode !== "single" && activeLayer && field && fieldB && display.data) {
+    const settings = layerSettings[activeLayer];
+    const settingsB = layerSettings[secondLayer];
+    const { cells, values, version } = field;
+    const valuesB = fieldB.values;
+    const pieces = piecesOf(cells);
+    const fillA = fillColor<ClippedCell>(activeLayer, settings, values, (piece) => piece.index);
+    const fillB = fillColor<ClippedCell>(secondLayer, settingsB, valuesB, (piece) => piece.index);
+    const keyA = [activeLayer, version, settings.opacity, settings.range[0], settings.range[1], ringKey];
+    const keyB = [secondLayer, fieldB.version, settingsB.opacity, settingsB.range[0], settingsB.range[1], ringKey];
+
+    if (mode === "compare") {
+      const sides = split ? splitPieces(pieces, split) : { left: pieces, right: [] };
+      layers.push(
+        pieceLayer({
+          ...pieceTheme,
+          id: DATA_LAYER_ID,
+          pieces: sides.left,
+          getFillColor: (piece) => fillA(piece, { index: 0 }),
+          fillKey: keyA,
+          opacity: settings.opacity,
+        }),
+        pieceLayer({
+          ...pieceTheme,
+          id: DATA_LAYER_B_ID,
+          pieces: sides.right,
+          getFillColor: (piece) => fillB(piece, { index: 0 }),
+          fillKey: keyB,
+          opacity: settingsB.opacity,
+        }),
+      );
+    } else if (mode === "blend") {
+      const alpha = settings.opacity / DEFAULT_OPACITY;
+      layers.push(
+        pieceLayer({
+          ...pieceTheme,
+          id: DATA_LAYER_ID,
+          pieces,
+          getFillColor: (piece) => {
+            const a = values[piece.index];
+            const b = valuesB[piece.index];
+            if (Number.isNaN(a) || Number.isNaN(b)) return TRANSPARENT;
+            return withOpacity(BLEND_COLORS[valueClass(secondLayer, b)][valueClass(activeLayer, a)], Math.min(1, alpha));
+          },
+          fillKey: [...keyA, ...keyB],
+          opacity: settings.opacity,
+        }),
+      );
+    } else {
+      // Columns: the active layer is the height, the second layer the color.
+      const [lo, hi] = heightDomain;
+      layers.push(
+        pieceLayer({
+          ...pieceTheme,
+          id: DATA_LAYER_ID,
+          pieces,
+          // Solid sides and tops: see-through columns show the ones behind them.
+          getFillColor: (piece) => {
+            const color = fillB(piece, { index: 0 });
+            return color[3] === 0 ? color : [color[0], color[1], color[2], COLUMN_ALPHA];
+          },
+          fillKey: keyB,
+          opacity: settingsB.opacity,
+          height: {
+            get: (piece) => {
+              const value = values[piece.index];
+              return Number.isNaN(value) ? 0 : Math.min(1, Math.max(0, (value - lo) / (hi - lo)));
+            },
+            scale: COLUMN_MAX_PX * metresPerPixel(zoom),
+            key: [activeLayer, version, ringKey, lo, hi],
+          },
+        }),
+      );
+    }
+  } else if (mode === "single" && activeLayer && field && display.data) {
     const settings = layerSettings[activeLayer];
     const { cells, values, version } = field;
 

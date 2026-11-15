@@ -10,6 +10,44 @@ export const browser = {
   noPlot: "No plot yet",
   drawSquare: "Draw an area",
   layers: "Layers",
+  /** View modes: one layer, or a combined view. */
+  view: {
+    label: "View",
+    /** Short tile labels; `modeNames` are the full names for tooltips and screen readers. */
+    modes: { single: "Single", compare: "Compare", blend: "Blend", columns: "Columns", score: "Score" },
+    modeNames: {
+      single: "Single layer",
+      compare: "Compare two layers",
+      blend: "Blend two layers",
+      columns: "3D columns",
+      score: "Crop score",
+    },
+    hints: {
+      single: "One layer at a time.",
+      compare: "Two layers side by side. Drag the divider on the map.",
+      blend: "Two layers as one color: every cell is low, mid or high on each.",
+      columns: "One layer as height, another as color, on a tilted map.",
+      score: "How well a crop fits each place, from the last 12 months.",
+    },
+    /** What the active and the second layer do in each two-layer view. */
+    roles: {
+      compare: ["Left", "Right"],
+      blend: ["Across", "Up"],
+      columns: ["Height", "Color"],
+    },
+    swap: "Swap the two layers",
+    legendOf: (role: string, layer: string) => `${role} · ${layer}`,
+    axis: (layer: string) => `${layer} →`,
+    breaks: (layer: string, low: string, high: string) => `${layer}: low under ${low}, high over ${high}`,
+    blendLabel: (first: string, second: string) => `Colors for low, mid and high ${first} and ${second}`,
+    height: (layer: string, min: string, max: string) => `Height · ${layer}, ${min} to ${max}`,
+    crop: "Crop",
+    scoreLoading: "Loading 12 months of NASA POWER data…",
+    scoreLegend: "Outlook score",
+    scoreEnds: { poor: "Poor · under 45", fair: "Fair", good: "Good · 70+" },
+    scoreNote:
+      "Every cell is scored like a plot's outlook: NASA POWER temperature, humidity and rainfall over the last 12 months. Soil condition is simulated.",
+  },
   showLayer: (layer: string) => `Show ${layer}`,
   /** Screen-reader note on a layer row: expanding it also changes what the map shows. */
   rowHint: "Also shows this layer on the map and hides the others.",
@@ -28,7 +66,7 @@ export const browser = {
   rangeReadout: (min: string, max: string, unit: string) => `${min} – ${max} ${unit}`,
   reset: "Reset",
   resetLayer: (layer: string) => `Reset ${layer} opacity and range`,
-  /** Live NASA POWER precipitation layer. */
+  /** Live NASA POWER layers (precipitation, temperature, humidity, soil moisture) and their timeline. */
   precip: {
     badge: "NASA",
     badgeHint: "Live data from the NASA POWER API",
@@ -61,10 +99,14 @@ export const browser = {
     places: { pin: "At your pin", plot: "At your plot", default: "San Salvador" },
     total: (days: number) => `${days}-day total`,
     wettestShort: (day: string) => `wettest ${day}`,
-    dockLabel: "Precipitation timeline",
+    dockLabel: (layer: string) => `${layer} timeline`,
+    mean: (days: number) => `${days}-day mean`,
+    range: (min: string, max: string) => `${min}–${max}`,
+    hotDays: (count: number, threshold: number) =>
+      count === 1 ? `1 day above ${threshold} °C` : `${count} days above ${threshold} °C`,
     noData: "No data",
-    chartLabel: (place: string, from: string, to: string) =>
-      `Daily precipitation ${place.toLowerCase()}, ${from} to ${to}`,
+    chartLabel: (layer: string, place: string, from: string, to: string) =>
+      `Daily ${layer.toLowerCase()} ${place.toLowerCase()}, ${from} to ${to}`,
     source: "NASA POWER daily data. The newest days are near-real-time estimates and may be revised.",
     pointError: "Couldn't load this location.",
   },

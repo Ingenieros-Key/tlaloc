@@ -4,10 +4,13 @@ import type { Feature, Polygon } from "geojson";
 export type SampleLayerId = "humidity" | "rain" | "soil";
 
 /** Data layers shown in the Browser and on the map. All live NASA POWER data. */
-export type LayerId = "precip";
+export type LayerId = "precip" | "temp" | "humidity" | "moisture";
 
-/** Any layer with a definition: the visible layers plus the sample factors behind the crop outlook. */
-export type AnyLayerId = SampleLayerId | LayerId;
+/** What the crop outlook scores. Each comes from NASA POWER or, failing that, the sample grid. */
+export type FactorId = "temp" | "humidity" | "rain" | "soil";
+
+/** Any layer with a definition: the visible layers plus the factors behind the crop outlook. */
+export type AnyLayerId = SampleLayerId | LayerId | FactorId;
 
 export type Rgba = readonly [number, number, number, number];
 
@@ -59,6 +62,13 @@ export type DataField = {
 /** How the active layer is drawn. */
 export type DataStyle = "hexagons" | "heatmap";
 
+/**
+ * What the map draws. "single": one layer. "compare": two layers either side of a divider.
+ * "blend": two layers as one color from a 3 × 3 matrix. "columns": one layer as height, another as
+ * color. "score": the crop outlook for every cell.
+ */
+export type ViewMode = "single" | "compare" | "blend" | "columns" | "score";
+
 export type Tool = "pan" | "square" | "edit";
 
 /** Things the Display card can show or hide. Order here is display order within each section. */
@@ -70,6 +80,7 @@ export type DisplayKey =
   | "tooltips"
   | "pin"
   | "plotLabel"
+  | "timeline"
   | "navBar"
   | "legends"
   | "limiting";
@@ -94,7 +105,7 @@ export type CropId = "corn" | "beans" | "sorghum";
 export type Rating = "good" | "fair" | "poor";
 
 export type FactorScore = {
-  readonly layer: SampleLayerId;
+  readonly layer: FactorId;
   /** Mean sampled value over the plot, in layer units. */
   readonly value: number;
   /** 0..100: how close the value is to the crop's ideal band. */
@@ -115,7 +126,7 @@ export type CropAssessment = {
   /** Same order as LAYER_ORDER. */
   readonly factors: readonly FactorScore[];
   /** The factor with the lowest score (null when every factor is within its ideal band). */
-  readonly limiting: SampleLayerId | null;
+  readonly limiting: FactorId | null;
 };
 
 export type Assessment =

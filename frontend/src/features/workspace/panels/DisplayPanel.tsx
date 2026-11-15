@@ -9,7 +9,7 @@ const s = t.inspector.display;
 
 const SECTIONS: readonly { readonly id: keyof typeof s.sections; readonly keys: readonly DisplayKey[] }[] = [
   { id: "map", keys: ["data", "borders", "outline", "labels"] },
-  { id: "overlays", keys: ["tooltips", "pin", "plotLabel", "navBar"] },
+  { id: "overlays", keys: ["tooltips", "pin", "plotLabel", "timeline", "navBar"] },
   { id: "panels", keys: ["legends", "limiting"] },
 ];
 

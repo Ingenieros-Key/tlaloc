@@ -22,7 +22,7 @@ import { RangeSlider } from "./RangeSlider";
  * controls.
  */
 export function LayerRow({ id }: { readonly id: LayerId }) {
-  const { activeLayer, layerSettings, display, precip, dataStyle } = useWorkspace();
+  const { activeLayer, layerSettings, display, layerData, dataStyle } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -97,15 +97,15 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
       >
         <div className="min-h-0 overflow-hidden">
           <div className="space-y-3 border-b border-line bg-surface-2 px-3 pb-3 pt-2">
-            {live && precip.status === "loading" ? (
+            {live && layerData.status === "loading" ? (
               <p role="status" className="text-xs text-muted">
                 {t.browser.precip.loading}
               </p>
             ) : null}
-            {live && precip.status === "error" ? (
+            {live && layerData.status === "error" ? (
               <div role="alert" className="flex items-start justify-between gap-2 text-xs">
                 <p className="text-poor">{t.browser.precip.error}</p>
-                <RetryButton onClick={precip.retry} />
+                <RetryButton onClick={layerData.retry} />
               </div>
             ) : null}
             {live ? <PrecipTimeline /> : null}
@@ -120,7 +120,7 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
               onChange={(style) => dispatch({ type: "setDataStyle", style })}
             />
             {display.legends ? <Legend layer={layer} range={settings.range} /> : null}
-            {live && precip.status === "ready" ? (
+            {live && layerData.status === "ready" ? (
               <p className="text-[11px] leading-snug text-muted">{t.browser.precip.resolution}</p>
             ) : null}
             {/* Display options: opacity and the value filter, folded away by default. */}

@@ -112,6 +112,8 @@ const LG_QUERY = "(min-width: 1024px)";
 const GAP = 24;
 /** Inset of the floating panels from the canvas edge (Tailwind lg:left-3 / lg:right-3). */
 const PANEL_INSET = 12;
+/** Gap between the tool rail and the flyout beside it (the dock's lg:left adds it to the rail). */
+const RAIL_GAP = 8;
 const NAV_BAR_CLEARANCE = 80;
 const MIN_VIEWPORT = 120;
 
@@ -121,14 +123,16 @@ function cssPx(name: string, fallback: number): number {
 }
 
 /**
- * Camera padding that keeps fitted content clear of the floating chrome: Browser panel on the left,
- * Inspector on the right (lg+ only; below lg they are off-canvas drawers) and the nav bar at the
- * bottom. Falls back to a small uniform padding when the canvas is too small for the full insets.
+ * Camera padding that keeps fitted content clear of the floating chrome: the tool rail and, when
+ * open, its flyout on the left, the Inspector on the right (lg+ only; below lg both panels are
+ * off-canvas drawers) and the nav bar at the bottom. Falls back to a small padding, still clear of
+ * the rail, when the canvas is too small for the full insets.
  */
-export function cameraPadding(container: HTMLElement, inspector = true): PaddingOptions {
-  const small: PaddingOptions = { top: GAP, right: GAP, bottom: NAV_BAR_CLEARANCE, left: GAP };
+export function cameraPadding(container: HTMLElement, inspector = true, browser = true): PaddingOptions {
+  const rail = cssPx("--tl-rail-w", 54);
+  const small: PaddingOptions = { top: GAP, right: GAP, bottom: NAV_BAR_CLEARANCE, left: rail + GAP };
   if (!window.matchMedia(LG_QUERY).matches) return small;
-  const left = PANEL_INSET + cssPx("--tl-browser-w", 272) + GAP;
+  const left = PANEL_INSET + rail + (browser ? RAIL_GAP + cssPx("--tl-browser-w", 272) : 0) + GAP;
   // The Inspector is only on screen with Display open or plot results (see inspectorVisible).
   const right = inspector ? PANEL_INSET + cssPx("--tl-inspector-w", 328) + GAP : GAP;
   const fitsX = container.clientWidth - left - right >= MIN_VIEWPORT;

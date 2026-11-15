@@ -4,30 +4,54 @@ import { Pencil, Square } from "lucide-react";
 import { useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { LAYER_ORDER } from "../layers";
 import { focusMapCanvas } from "../map/focus";
-import { PLOT_NAME_MAX, useMapController, usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
+import { PLOT_NAME_MAX, useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import { IconButton } from "../ui/IconButton";
 import { Panel, PanelGroup } from "../ui/Panel";
 import { formatHectares } from "./format";
 import { LayerRow } from "./LayerRow";
+import { ViewControls } from "./ViewGroup";
 
-/** Left "Browser" panel: the drawn plot and the sample data layers (one visible at a time). */
+/**
+ * The tool rail's flyout (a drawer below lg): the section its pressed tool belongs to. "Plots"
+ * holds the drawn plot; a view mode holds its controls, and the single-layer view adds the NASA
+ * POWER layer list (one visible at a time). At lg and up it is only as tall as its content.
+ */
 export function BrowserPanel() {
-  const collapse = usePanelCollapse("browser", t.browser.title);
+  const { viewMode, browserSection } = useWorkspace();
+  const dispatch = useWorkspaceDispatch();
+  const plots = browserSection === "plots";
   return (
     <Panel
-      title={t.browser.title}
+      title={plots ? t.browser.plots : t.browser.view.modeNames[viewMode]}
       labelledBy="browser-title"
-      collapse={collapse}
+      close={{
+        label: t.chrome.closePanel,
+        onClose: () => {
+          dispatch({ type: "setPanel", panel: "browser", open: false });
+          dispatch({ type: "setCollapsed", panel: "browser", collapsed: true });
+        },
+      }}
+      className="lg:flex-[0_1_auto]"
     >
-      <PlotsGroup />
-      <PanelGroup label={t.browser.layers} count={LAYER_ORDER.length}>
-        <ul>
-          {LAYER_ORDER.map((id) => (
-            <LayerRow key={id} id={id} />
-          ))}
-        </ul>
-      </PanelGroup>
+      {plots ? (
+        <PlotsGroup />
+      ) : (
+        <>
+          <ViewControls />
+          {viewMode === "single" ? (
+            <div className="mt-2 border-t border-line">
+              <PanelGroup label={t.browser.layers} count={LAYER_ORDER.length}>
+                <ul>
+                  {LAYER_ORDER.map((id) => (
+                    <LayerRow key={id} id={id} />
+                  ))}
+                </ul>
+              </PanelGroup>
+            </div>
+          ) : null}
+        </>
+      )}
     </Panel>
   );
 }
@@ -47,7 +71,7 @@ function PlotsGroup() {
   };
 
   return (
-    <PanelGroup label={t.browser.plots} count={plotSummary ? 1 : 0}>
+    <div className="py-2">
       {plotSummary ? (
         <ul className="px-1.5">
           <li className="flex items-center gap-0.5">
@@ -95,7 +119,7 @@ function PlotsGroup() {
           </button>
         </div>
       )}
-    </PanelGroup>
+    </div>
   );
 }
 

@@ -7,6 +7,7 @@ import { NavBar } from "./chrome/NavBar";
 import { PlotUndoToast } from "./chrome/PlotUndoToast";
 import { TimelineDock } from "./chrome/TimelineDock";
 import { Ribbon } from "./chrome/Ribbon";
+import { ToolRail } from "./chrome/ToolRail";
 import { TopBar } from "./chrome/TopBar";
 import { DRAWER_QUERY, useMediaQuery } from "./hooks/useMediaQuery";
 import { AnalysisAnnouncer } from "./panels/AnalysisAnnouncer";
@@ -55,6 +56,7 @@ function Canvas() {
       <div className="absolute inset-0" data-shortcuts="map" inert={covered}>
         <MapView />
       </div>
+      <ToolRail inert={covered} />
       <Drawers drawerLayout={drawerLayout} />
       <AnalysisAnnouncer />
       <div
@@ -62,7 +64,7 @@ function Canvas() {
         className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center px-4"
       >
         <PlotUndoToast />
-        <TimelineDock />
+        {display.timeline ? <TimelineDock /> : null}
         {display.navBar ? <NavBar /> : null}
       </div>
     </main>
@@ -106,6 +108,7 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
         panel="browser"
         open={panels.browser}
         drawerLayout={drawerLayout}
+        closedAtLg={state.collapsed.browser}
       >
         <BrowserPanel />
       </Dock>
@@ -120,7 +123,7 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
 
 /**
  * lg+: panel floats over the map at a fixed width. Below lg: off-canvas drawer toggled from the
- * top bar, closed with Escape or the scrim. Opening a drawer moves focus to its heading; closing it
+ * tool rail (left) or the top bar (right), closed with Escape or the scrim. Opening a drawer moves focus to its heading; closing it
  * returns focus to its top-bar toggle unless an in-panel action already moved focus elsewhere.
  * The dock always spans the full height and lets clicks through; the panel inside grows into it
  * and slides down to its header when collapsed (see `Panel`), so the map stays usable below it.
@@ -130,12 +133,15 @@ function Dock({
   panel,
   open,
   drawerLayout,
+  closedAtLg = false,
   children,
 }: {
   readonly side: "left" | "right";
   readonly panel: PanelId;
   readonly open: boolean;
   readonly drawerLayout: boolean;
+  /** lg and up: the panel is closed (the tool rail's flyout), not merely folded. */
+  readonly closedAtLg?: boolean;
   readonly children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -159,7 +165,8 @@ function Dock({
   }, [open, drawerLayout]);
 
   const width = side === "left" ? "w-[var(--tl-browser-w)]" : "w-[var(--tl-inspector-w)]";
-  const position = side === "left" ? "left-0 lg:left-3" : "right-0 lg:right-3";
+  // The left panel is the tool rail's flyout: at lg it sits beside the rail (12px inset, 8px gap).
+  const position = side === "left" ? "left-0 lg:left-[calc(var(--tl-rail-w)+1.25rem)]" : "right-0 lg:right-3";
   const hidden = side === "left" ? "max-lg:-translate-x-full" : "max-lg:translate-x-full";
   return (
     <div
@@ -167,7 +174,7 @@ function Dock({
       id={`dock-${panel}`}
       className={`pointer-events-none absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:bottom-3 lg:top-3 ${width} ${position} ${
         open ? "max-lg:translate-x-0" : `${hidden} max-lg:invisible`
-      }`}
+      } ${closedAtLg ? "lg:hidden" : ""}`}
     >
       {children}
     </div>

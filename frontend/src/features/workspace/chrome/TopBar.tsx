@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, PanelLeft, PanelRight, type LucideIcon } from "lucide-react";
+import { Menu, PanelRight, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { t } from "../strings";
 import { inspectorVisible, useWorkspace, useWorkspaceDispatch, type PanelId } from "../store";
@@ -13,7 +13,8 @@ import { LangToggle, ThemeToggle } from "@/components/ui/toggles";
 const s = t.chrome.topBar;
 
 /**
- * App bar: shared site nav (brand + links + auth), project name and drawer toggles. Below lg the
+ * App bar: shared site nav (brand + links + auth), project name and the Results drawer toggle (the
+ * tool rail opens the left drawer). Below lg the
  * links, language, theme and sign-in fold into a menu so the bar fits a 375 px phone.
  */
 export function TopBar() {
@@ -28,7 +29,6 @@ export function TopBar() {
       </p>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div className="flex items-center lg:hidden">
-          <DrawerToggle panel="browser" other="inspector" icon={PanelLeft} label={s.openLayers} />
           <InspectorToggle />
           <SiteMenu />
         </div>
