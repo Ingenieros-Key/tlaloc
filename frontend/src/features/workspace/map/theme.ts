@@ -16,7 +16,9 @@ export const BG_HEX: HexColor = "#060818";
 
 /** Country outline: the muted lavender of MUTED_CELL, made opaque enough to read on both basemaps. */
 export const OUTLINE_COLOR: Rgba = [MUTED_CELL[0], MUTED_CELL[1], MUTED_CELL[2], 200];
-/** Hairline between hexagons: --tl-bg at low alpha. */
+/** Hairline between hexagons: --tl-bg at low alpha (light basemap). */
 export const CELL_STROKE: Rgba = [6, 8, 24, 90];
+/** Hairline between hexagons on the dark basemap, where a navy stroke disappears: --tl-muted. */
+export const CELL_STROKE_DARK: Rgba = [154, 163, 199, 70];
 /** Hover highlight on the active data layer: cream at low alpha. */
 export const CELL_HIGHLIGHT: Rgba = [244, 240, 230, 70];

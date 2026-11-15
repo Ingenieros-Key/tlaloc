@@ -1,8 +1,7 @@
 "use client";
 
 import type { PowerDate } from "@/lib/nasa-power";
-import { Pause, Play } from "lucide-react";
-import { useId, useState, type CSSProperties, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import {
   MAX_RANGE_DAYS,
   POWER_FIRST_DAY,
@@ -12,23 +11,10 @@ import {
   windowDays,
   type PrecipWindow,
 } from "../data/precip";
-import {
-  PRECIP_SPEEDS,
-  lastDay,
-  precipDayIndex,
-  useWorkspace,
-  useWorkspaceDispatch,
-  type PrecipMode,
-  type PrecipSpeed,
-} from "../store";
+import { useWorkspace, useWorkspaceDispatch, type PrecipMode } from "../store";
 import { t } from "../strings";
-import { Badge } from "../ui/Badge";
-import { IconButton } from "../ui/IconButton";
 import { Segmented } from "../ui/Segmented";
 import { formatDay } from "./format";
-import styles from "./sliders.module.css";
-
-type FillStyle = CSSProperties & { readonly "--pct": number };
 
 const MODES: readonly PrecipMode[] = ["latest", "range"];
 
@@ -42,7 +28,8 @@ function fromIso(value: string): PowerDate {
 
 /**
  * What the precipitation layer shows: the newest published day (default), or a timeframe the user
- * picks (a quick preset or custom dates) that can be scrubbed and played day by day.
+ * picks (a quick preset or custom dates). The day itself, playback and the point chart live in the
+ * timeline dock above the nav bar (see `TimelineDock`).
  */
 export function PrecipTimeline() {
   const { precipMode } = useWorkspace();
@@ -57,29 +44,11 @@ export function PrecipTimeline() {
         options={MODES.map((mode) => ({ value: mode, label: s.modes[mode] }))}
         onChange={(mode) => dispatch({ type: "setPrecipMode", mode })}
       />
-      {precipMode === "latest" ? <LatestDay /> : <Timeframe />}
-    </div>
-  );
-}
-
-function LatestDay() {
-  const { precip } = useWorkspace();
-  const s = t.browser.precip;
-  if (precip.status !== "ready") return null;
-  const date = precip.frames.dates[lastDay(precip)];
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted">{s.day}</span>
-        <span className="flex items-center gap-1.5">
-          <Badge tone="accent" className="px-1 py-0 text-[10px]">
-            {s.latest}
-          </Badge>
-          <span className="font-mono text-xs text-text tabular">{date ? formatDay(date) : "–"}</span>
-        </span>
-      </div>
-      <p className="text-[11px] leading-snug text-muted">{s.latestHint}</p>
+      {precipMode === "latest" ? (
+        <p className="text-[11px] leading-snug text-muted">{s.latestHint}</p>
+      ) : (
+        <Timeframe />
+      )}
     </div>
   );
 }
@@ -89,34 +58,25 @@ function Timeframe() {
   const dispatch = useWorkspaceDispatch();
   const s = t.browser.precip;
   const setRange = (range: PrecipWindow) => dispatch({ type: "setPrecipRange", range });
+  const selectedPreset =
+    PRECIP_PRESETS.map((days) => ({ days, range: presetRange(days) })).find(
+      ({ range }) => range.start === precipRange.start && range.end === precipRange.end,
+    )?.days ?? "";
 
   return (
     <div className="space-y-3">
-      <div role="group" aria-label={s.presetsLabel} className="flex flex-wrap gap-1">
-        {PRECIP_PRESETS.map((days) => {
-          const preset = presetRange(days);
-          const selected = preset.start === precipRange.start && preset.end === precipRange.end;
-          return (
-            <button
-              key={days}
-              type="button"
-              aria-pressed={selected}
-              aria-label={s.presetLabel(days)}
-              onClick={() => setRange(preset)}
-              className={`h-7 max-lg:h-11 min-w-10 cursor-pointer rounded-md border px-2 font-mono text-xs transition-colors duration-150 ${
-                selected
-                  ? "border-accent bg-accent/10 text-accent"
-                  : "border-line text-muted hover:border-line-strong hover:text-text"
-              }`}
-            >
-              {s.presetShort(days)}
-            </button>
-          );
-        })}
-      </div>
+      <Segmented<string>
+        label={s.presetsLabel}
+        value={`${selectedPreset}`}
+        options={PRECIP_PRESETS.map((days) => ({
+          value: `${days}`,
+          label: s.presetShort(days),
+          ariaLabel: s.presetLabel(days),
+        }))}
+        onChange={(days) => setRange(presetRange(Number(days)))}
+      />
       {/* Keyed by the range so the draft resets whenever a preset (or Apply) changes it. */}
       <RangeForm key={`${precipRange.start}-${precipRange.end}`} range={precipRange} onApply={setRange} />
-      <Player />
     </div>
   );
 }
@@ -158,7 +118,7 @@ function RangeForm({
   };
 
   const input =
-    "h-8 max-lg:h-11 w-full min-w-0 rounded-md border border-line bg-surface px-1.5 font-mono text-xs text-text tabular focus-visible:border-accent";
+    "h-8 max-lg:h-11 w-full min-w-0 rounded-md border border-input bg-surface px-1.5 font-mono text-xs text-text tabular focus-visible:border-accent";
 
   return (
     <form onSubmit={submit} noValidate className="space-y-1.5">
@@ -209,92 +169,5 @@ function RangeForm({
         </button>
       </div>
     </form>
-  );
-}
-
-/** Play button and day scrubber over the loaded timeframe. */
-function Player() {
-  const state = useWorkspace();
-  const { precip, precipPlaying, precipSpeed } = state;
-  const dispatch = useWorkspaceDispatch();
-  const sliderId = useId();
-  const s = t.browser.precip;
-
-  if (precip.status === "loading") {
-    return (
-      <p role="status" className="text-xs text-muted">
-        {s.loading}
-      </p>
-    );
-  }
-  if (precip.status !== "ready" || precip.frames.dates.length === 0) return null;
-
-  const { dates } = precip.frames;
-  const last = lastDay(precip);
-  const day = precipDayIndex(state);
-  const date = dates[day];
-  const style: FillStyle = { "--pct": day / Math.max(1, last) };
-  // Short labels ("Nov 12") only when the timeframe stays inside one year.
-  const short = dates[0].slice(0, 4) === dates[last].slice(0, 4);
-
-  return (
-    <div className="space-y-1" aria-busy={precip.refreshing}>
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={sliderId} className="text-xs text-muted">
-          {precip.refreshing ? s.loadingRange : s.day}
-        </label>
-        <output
-          htmlFor={sliderId}
-          aria-live={precipPlaying ? "off" : "polite"}
-          className="font-mono text-xs text-text tabular"
-        >
-          {formatDay(date)}
-        </output>
-      </div>
-      <div className={`flex items-center gap-1 transition-opacity duration-200 ${precip.refreshing ? "opacity-50" : ""}`}>
-        <IconButton
-          icon={precipPlaying ? Pause : Play}
-          label={precipPlaying ? s.pause : s.play(dates.length)}
-          pressed={precipPlaying}
-          size="sm"
-          disabled={precip.refreshing}
-          // From the last day, playback restarts at the beginning of the timeframe.
-          onClick={() =>
-            dispatch({ type: "setPrecipPlaying", playing: !precipPlaying, from: day >= last ? 0 : day })
-          }
-        />
-        <div className="min-w-0 flex-1">
-          <input
-            id={sliderId}
-            type="range"
-            min={0}
-            max={last}
-            step={1}
-            value={day}
-            disabled={precip.refreshing}
-            aria-valuetext={formatDay(date)}
-            onChange={(e) => {
-              const picked = Number(e.currentTarget.value);
-              dispatch({ type: "setPrecipDay", day: picked >= last ? null : picked });
-            }}
-            className={styles.slider}
-            style={style}
-          />
-          <div aria-hidden="true" className="flex justify-between font-mono text-[10px] text-muted tabular">
-            <span>{formatDay(dates[0], short)}</span>
-            <span>{formatDay(dates[last], short)}</span>
-          </div>
-        </div>
-      </div>
-      <div className="pt-1">
-        <Segmented<`${PrecipSpeed}`>
-          label={s.speed}
-          showLabel
-          value={`${precipSpeed}`}
-          options={PRECIP_SPEEDS.map((speed) => ({ value: `${speed}`, label: s.speedLabel(speed) }))}
-          onChange={(value) => dispatch({ type: "setPrecipSpeed", speed: Number(value) as PrecipSpeed })}
-        />
-      </div>
-    </div>
   );
 }

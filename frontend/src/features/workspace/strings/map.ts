@@ -28,6 +28,7 @@ export const map = {
     boundary: "Boundary: geoBoundaries, © OpenStreetMap contributors",
     gibs: "Imagery: NASA GIBS / ESDIS",
   },
+  dryDay: (max: string) => `No rain this day · max ${max} mm`,
   tooltip: {
     outsideRange: "Outside filter range",
     powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,

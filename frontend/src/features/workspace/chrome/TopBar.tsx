@@ -1,18 +1,21 @@
 "use client";
 
-import { Info, PanelLeft, PanelRight, type LucideIcon } from "lucide-react";
+import { Menu, PanelLeft, PanelRight, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { t } from "../strings";
 import { useWorkspace, useWorkspaceDispatch, type PanelId } from "../store";
-import { Badge } from "../ui/Badge";
 import { IconButton } from "../ui/IconButton";
 import { Brand } from "@/components/ui/brand";
 import { NavLinks } from "@/components/ui/nav-links";
 import { AuthControl } from "@/components/ui/auth-control";
+import { LangToggle, ThemeToggle } from "@/components/ui/toggles";
 
 const s = t.chrome.topBar;
 
-/** App bar: shared site nav (brand + links + auth), project name, sample-data notice, drawer toggles. */
+/**
+ * App bar: shared site nav (brand + links + auth), project name and drawer toggles. Below lg the
+ * links, language, theme and sign-in fold into a menu so the bar fits a 375 px phone.
+ */
 export function TopBar() {
   return (
     <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-3 border-b border-line bg-bg px-3">
@@ -23,13 +26,15 @@ export function TopBar() {
         <span className="sr-only">{s.projectLabel} </span>
         {s.projectName}
       </p>
-      <SampleDataNotice />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div className="flex items-center lg:hidden">
           <DrawerToggle panel="browser" other="inspector" icon={PanelLeft} label={s.openLayers} />
           <DrawerToggle panel="inspector" other="browser" icon={PanelRight} label={s.openResults} />
+          <SiteMenu />
         </div>
-        <AuthControl menuExtras />
+        <div className="max-lg:hidden">
+          <AuthControl menuExtras />
+        </div>
       </div>
     </header>
   );
@@ -65,15 +70,14 @@ function DrawerToggle({
 }
 
 /**
- * "Sample data" badge as a disclosure button: the explanation is reachable by click, tap and
- * keyboard (not hover-only). Closes on Escape, outside pointer-down or when focus leaves it.
+ * Phone and tablet menu: site links, language, theme and sign-in. Closes on Escape (returning focus
+ * to the button), an outside pointer-down, or when focus leaves it.
  */
-function SampleDataNotice() {
+function SiteMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const popoverId = useId();
-  const titleId = useId();
+  const menuId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -85,7 +89,7 @@ function SampleDataNotice() {
       if (e.key !== "Escape") return;
       e.preventDefault();
       setOpen(false);
-      if (rootRef.current?.contains(document.activeElement)) buttonRef.current?.focus();
+      buttonRef.current?.focus();
     };
     document.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown, true);
@@ -101,31 +105,35 @@ function SampleDataNotice() {
   };
 
   return (
-    <div ref={rootRef} className="relative shrink-0" onBlur={onBlur}>
-      <button
+    <div ref={rootRef} className="relative" onBlur={onBlur}>
+      <IconButton
         ref={buttonRef}
-        type="button"
+        icon={Menu}
+        label={s.menu}
         aria-expanded={open}
-        aria-controls={popoverId}
+        aria-controls={menuId}
+        className="aria-expanded:bg-accent/15 aria-expanded:text-accent"
         onClick={() => setOpen((value) => !value)}
-        className="-mx-1 inline-flex h-9 cursor-pointer max-lg:h-11 items-center rounded-md px-1 transition-opacity duration-150 hover:opacity-85"
-      >
-        <Badge tone="accent">
-          <Info aria-hidden="true" className="size-3.5" strokeWidth={2} />
-          {t.common.sampleData}
-        </Badge>
-      </button>
+      />
       <div
-        id={popoverId}
-        role="region"
-        aria-labelledby={titleId}
+        id={menuId}
         hidden={!open}
-        className="z-50 rounded-lg border border-line-strong bg-surface-2 p-3 shadow-lg shadow-black/40 max-sm:fixed max-sm:inset-x-4 max-sm:top-[calc(var(--tl-topbar-h)+0.25rem)] sm:absolute sm:left-0 sm:top-full sm:mt-1 sm:w-72"
+        className="absolute right-0 top-full z-50 mt-1 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-xl shadow-black/30"
       >
-        <p id={titleId} className="text-sm font-semibold text-text">
-          {s.sampleDataTitle}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted">{t.common.sampleDataHint}</p>
+        <NavLinks vertical />
+        <div className="my-1.5 h-px bg-line" />
+        <div className="flex h-11 items-center justify-between px-2.5">
+          <span className="text-[13px] text-muted">{s.language}</span>
+          {/* Touch-sized in the menu: 44 px rows on phones. */}
+          <LangToggle className="[&>button]:min-h-11 [&>button]:min-w-11" />
+        </div>
+        <div className="flex h-11 items-center justify-between px-2.5">
+          <span className="text-[13px] text-muted">{s.themeLabel}</span>
+          <ThemeToggle className="h-11 w-11" />
+        </div>
+        <div className="flex justify-end px-1.5 pb-1 pt-1.5">
+          <AuthControl className="min-h-11" />
+        </div>
       </div>
     </div>
   );

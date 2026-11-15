@@ -3,6 +3,11 @@ import { t } from "../strings";
 import type { LayerDef } from "../types";
 import { formatWithUnit } from "./format";
 
+/** Domain ends are round numbers, so they read "0 mm", not "0.0 mm". */
+function formatLegendEnd(layer: LayerDef, value: number): string {
+  return Number.isInteger(value) ? t.inspector.withUnit(value.toLocaleString("en-US"), layer.unit) : formatWithUnit(layer, value);
+}
+
 /**
  * Color ramp for a layer with numeric min/max labels (the labels, not the gradient, carry the
  * meaning). The part of the ramp outside the active range filter is dimmed, mirroring the map.
@@ -29,8 +34,8 @@ export function Legend({
         <div className="absolute inset-y-0 right-0 bg-surface/80" style={{ width: `${100 - pct(range[1])}%` }} />
       </div>
       <div className="mt-1 flex justify-between gap-2 font-mono text-xs text-muted tabular">
-        <span>{formatWithUnit(layer, min)}</span>
-        <span>{formatWithUnit(layer, max)}</span>
+        <span>{formatLegendEnd(layer, min)}</span>
+        <span>{formatLegendEnd(layer, max)}</span>
       </div>
     </div>
   );

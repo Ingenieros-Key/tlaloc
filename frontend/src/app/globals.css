@@ -20,6 +20,8 @@
   --tl-good: #5dbb63;
   --tl-fair: #f6b93b;
   --tl-poor: #f2724f;
+  /* Outline of form fields and chips: 3:1 against the surface (WCAG 1.4.11). */
+  --tl-input: #5f6aa8;
   --tl-overlay: rgb(6 8 24 / 0.72);
 
   --tl-topbar-h: 52px;
@@ -43,6 +45,11 @@ html.tl-light-theme {
   --tl-accent: #0a7268;
   --tl-accent-strong: #1fc8b4;
   --tl-on-accent: #ffffff;
+  /* Status colors darkened for light surfaces: 5.3–6.6:1 as text on white (dark values fail). */
+  --tl-good: #276a2c;
+  --tl-fair: #8a5a00;
+  --tl-poor: #b3401f;
+  --tl-input: #8f8a78;
   --tl-overlay: rgb(244 240 230 / 0.72);
 
   color-scheme: light;
@@ -64,6 +71,7 @@ html.tl-light-theme {
   --color-good: var(--tl-good);
   --color-fair: var(--tl-fair);
   --color-poor: var(--tl-poor);
+  --color-input: var(--tl-input);
   --color-overlay: var(--tl-overlay);
 
   --font-display: var(--font-chakra), ui-sans-serif, system-ui, sans-serif;

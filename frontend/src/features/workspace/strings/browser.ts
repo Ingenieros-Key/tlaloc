@@ -11,6 +11,9 @@ export const browser = {
   /** Screen-reader note on a layer row: expanding it also changes what the map shows. */
   rowHint: "Also shows this layer on the map and hides the others.",
   legend: "Legend",
+  displayOptions: "Display options",
+  displayOptionsHint: "Opacity, value range",
+  displayOptionsCustomized: "Customized",
   style: "Style",
   styles: { hexagons: "Hexagons", heatmap: "Heatmap" },
   opacity: "Opacity",
@@ -29,8 +32,7 @@ export const browser = {
     loading: "Loading NASA POWER data…",
     error: "Couldn't load NASA POWER data.",
     retry: "Retry",
-    resolution:
-      "NASA POWER data comes on a ~55 km grid; the map smooths it between grid points. The chart below uses the raw value for one point.",
+    resolution: "NASA POWER data comes on a ~55 km grid; the map smooths it between grid points.",
     day: "Day",
     loadingRange: "Loading timeframe…",
     modeLabel: "What to show",
@@ -55,10 +57,8 @@ export const browser = {
     pause: "Pause",
     places: { pin: "At your pin", plot: "At your plot", default: "San Salvador" },
     total: (days: number) => `${days}-day total`,
-    wetDays: "Rain days",
-    wetDaysHint: "Days with at least 1 mm",
-    wettest: "Wettest day",
-    days: (n: number) => `${n} d`,
+    wettestShort: (day: string) => `wettest ${day}`,
+    dockLabel: "Precipitation timeline",
     noData: "No data",
     chartLabel: (place: string, from: string, to: string) =>
       `Daily precipitation ${place.toLowerCase()}, ${from} to ${to}`,

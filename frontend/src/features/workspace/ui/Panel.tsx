@@ -98,7 +98,7 @@ export function PanelGroup({
     <div className="border-b border-line last:border-b-0">
       <div className="flex h-9 items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted">
         <span>{label}</span>
-        {count !== undefined ? <span className="tabular font-mono text-muted/80">{count}</span> : null}
+        {count !== undefined ? <span className="tabular font-mono text-muted">{count}</span> : null}
       </div>
       <div className="pb-2">{children}</div>
     </div>
