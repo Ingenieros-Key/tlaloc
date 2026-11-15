@@ -1,53 +1,75 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { getCurrentUser, fetchUserAttributes, signOut as amplifySignOut } from "aws-amplify/auth";
 import "@/lib/amplify";
 
 export type AuthStatus = "loading" | "in" | "out";
 
-export interface AuthProfile {
+interface AuthState {
   status: AuthStatus;
   firstName?: string;
+}
+
+export interface AuthProfile extends AuthState {
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
+const LOADING: AuthState = { status: "loading" };
+
+// Single shared auth state so the nav, the hero and any other consumer stay in sync
+// (e.g. the home hero flips to the signed-in view the moment the modal signs in).
+let state: AuthState = LOADING;
+let started = false;
+const listeners = new Set<() => void>();
+
+function emit() {
+  listeners.forEach((fn) => fn());
+}
+
+export async function refreshAuth(): Promise<void> {
+  try {
+    await getCurrentUser();
+    let firstName: string | undefined;
+    try {
+      firstName = (await fetchUserAttributes()).given_name;
+    } catch {
+      /* attributes optional */
+    }
+    state = { status: "in", firstName };
+  } catch {
+    state = { status: "out" };
+  }
+  emit();
+}
+
+async function signOut(): Promise<void> {
+  try {
+    await amplifySignOut();
+  } catch {
+    /* ignore */
+  }
+  state = { status: "out" };
+  emit();
+}
+
+function subscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
 export function useAuthProfile(): AuthProfile {
-  const [status, setStatus] = useState<AuthStatus>("loading");
-  const [firstName, setFirstName] = useState<string | undefined>();
-
-  const refresh = useCallback(async () => {
-    try {
-      await getCurrentUser();
-      let name: string | undefined;
-      try {
-        const attrs = await fetchUserAttributes();
-        name = attrs.given_name;
-      } catch {
-        /* attributes optional */
-      }
-      setFirstName(name);
-      setStatus("in");
-    } catch {
-      setStatus("out");
-      setFirstName(undefined);
-    }
-  }, []);
-
+  const snap = useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => LOADING,
+  );
   useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const signOut = useCallback(async () => {
-    try {
-      await amplifySignOut();
-    } catch {
-      /* ignore */
+    if (!started) {
+      started = true;
+      refreshAuth();
     }
-    setStatus("out");
-    setFirstName(undefined);
   }, []);
-
-  return { status, firstName, refresh, signOut };
+  return { ...snap, refresh: refreshAuth, signOut };
 }
