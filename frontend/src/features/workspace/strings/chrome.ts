@@ -3,6 +3,8 @@ import type { Basemap, Tool } from "../types";
 /** UI strings for the chrome area. Owned by the chrome module; add keys freely. */
 export const chrome = {
   closePanel: "Close panel",
+  collapsePanel: (panel: string) => `Collapse ${panel}`,
+  expandPanel: (panel: string) => `Expand ${panel}`,
   topBar: {
     projectLabel: "Project:",
     projectName: "Untitled plot",
@@ -49,7 +51,7 @@ export const chrome = {
       satellite: "Satellite",
     } satisfies Record<Basemap, string>,
     basemapTips: {
-      map: "Dark vector street map",
+      map: "Vector street map",
       satellite: "NASA GIBS satellite imagery",
     } satisfies Record<Basemap, string>,
     needsPlot: "draw a plot first",

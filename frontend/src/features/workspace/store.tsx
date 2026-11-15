@@ -15,6 +15,7 @@ import { computeAssessment } from "./data/assessment";
 import { summarizePlot } from "./data/plot";
 import { getSampleGrid } from "./data/sample-grid";
 import { LAYER_ORDER, defaultLayerSettings } from "./layers";
+import { t } from "./strings";
 import type {
   AnalysisState,
   Basemap,
@@ -44,6 +45,8 @@ export type WorkspaceState = {
   readonly view: ViewState;
   /** Drawer open state, only meaningful below the lg breakpoint. */
   readonly panels: Readonly<Record<PanelId, boolean>>;
+  /** Floating panel collapsed to its header, only meaningful at lg and up. */
+  readonly collapsed: Readonly<Record<PanelId, boolean>>;
 };
 
 export type WorkspaceAction =
@@ -59,7 +62,8 @@ export type WorkspaceAction =
   | { readonly type: "runAnalysis" }
   | { readonly type: "analysisFinished"; readonly analysis: AnalysisState }
   | { readonly type: "setView"; readonly view: ViewState }
-  | { readonly type: "setPanel"; readonly panel: PanelId; readonly open: boolean };
+  | { readonly type: "setPanel"; readonly panel: PanelId; readonly open: boolean }
+  | { readonly type: "setCollapsed"; readonly panel: PanelId; readonly collapsed: boolean };
 
 export const INITIAL_STATE: WorkspaceState = {
   tool: "pan",
@@ -76,6 +80,7 @@ export const INITIAL_STATE: WorkspaceState = {
   analysisNonce: 0,
   view: { bearing: 0, pitch: 30, zoom: 8 },
   panels: { browser: false, inspector: false },
+  collapsed: { browser: false, inspector: false },
 };
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
@@ -115,6 +120,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         plot: action.plot,
         plotSummary: summarizePlot(action.plot),
         analysis: { status: "running" },
+        // A new plot produces results, so bring the Inspector back if it was collapsed.
+        collapsed: { ...state.collapsed, inspector: false },
       };
     case "clearPlot":
       return {
@@ -134,6 +141,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return { ...state, view: action.view };
     case "setPanel":
       return { ...state, panels: { ...state.panels, [action.panel]: action.open } };
+    case "setCollapsed":
+      return { ...state, collapsed: { ...state.collapsed, [action.panel]: action.collapsed } };
   }
 }
 
@@ -196,4 +205,19 @@ export function useMapController(): MapControllerRegistry {
   const value = useContext(MapControllerContext);
   if (!value) throw new Error("useMapController must be used inside <WorkspaceProvider>");
   return value;
+}
+
+/** Collapse wiring for a floating panel's header toggle (see `Panel`'s `collapse` prop). */
+export function usePanelCollapse(panel: PanelId, title: string) {
+  const { collapsed } = useWorkspace();
+  const dispatch = useWorkspaceDispatch();
+  const isCollapsed = collapsed[panel];
+  return useMemo(
+    () => ({
+      collapsed: isCollapsed,
+      onToggle: () => dispatch({ type: "setCollapsed", panel, collapsed: !isCollapsed }),
+      label: isCollapsed ? t.chrome.expandPanel(title) : t.chrome.collapsePanel(title),
+    }),
+    [dispatch, isCollapsed, panel, title],
+  );
 }
