@@ -7,6 +7,7 @@ export const landingCopy: Record<Lang, {
   building: string;
   signIn: string;
   signedIn: string;
+  signOut: string;
 }> = {
   en: {
     tag: "NASA Space Apps 2026",
@@ -15,6 +16,7 @@ export const landingCopy: Record<Lang, {
     building: "Building",
     signIn: "Sign in",
     signedIn: "Signed in",
+    signOut: "Sign out",
   },
   es: {
     tag: "NASA Space Apps 2026",
@@ -23,6 +25,7 @@ export const landingCopy: Record<Lang, {
     building: "Construyendo",
     signIn: "Iniciar sesión",
     signedIn: "Sesión iniciada",
+    signOut: "Cerrar sesión",
   },
 };
 

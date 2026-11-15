@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser } from "aws-amplify/auth";
+import { getCurrentUser, signOut } from "aws-amplify/auth";
 import "@/lib/amplify";
 import { AuthModal } from "@/components/ui/auth-modal";
 import { landingCopy, type Lang } from "@/components/ui/i18n";
@@ -13,7 +13,8 @@ const css = `
     radial-gradient(1200px 600px at 50% -10%, rgba(31,200,180,0.14), transparent 60%),
     radial-gradient(900px 500px at 85% 110%, rgba(43,58,158,0.35), transparent 60%),
     #0b1033;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   --hueso: #f4f0e6;
@@ -45,9 +46,12 @@ const css = `
 .tl-chip {
   display: inline-flex; align-items: center; gap: 0.5rem;
   border: 1px solid rgba(31,200,180,0.4); background: rgba(31,200,180,0.12); color: var(--jade);
-  border-radius: 999px; padding: 0.45rem 1.1rem;
+  border-radius: 999px; padding: 0.45rem 1.1rem; cursor: pointer;
   font-family: var(--font-plex-mono), monospace; font-size: 0.8rem; letter-spacing: 0.04em;
+  transition: background 0.15s;
 }
+.tl-chip:hover { background: rgba(31,200,180,0.2); }
+.tl-chip .tl-logout { opacity: 0.7; }
 .tl-main {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; padding: 2rem 1.5rem 3rem; gap: 1.5rem;
@@ -108,13 +112,24 @@ export default function Home() {
         {auth === "loading" ? (
           <img src="/tlaloc-loader.svg" alt="" aria-hidden width={32} height={32} />
         ) : auth === "in" ? (
-          <span className="tl-chip">
+          <button
+            type="button"
+            className="tl-chip"
+            onClick={() => signOut().then(() => setAuth("out")).catch(() => setAuth("out"))}
+            title={t.signOut}
+            aria-label={t.signOut}
+          >
             <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M20 21a8 8 0 0 0-16 0" />
               <circle cx="12" cy="7" r="4" />
             </svg>
             {t.signedIn}
-          </span>
+            <svg className="tl-logout" viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="m16 17 5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+          </button>
         ) : (
           <button type="button" className="tl-signin" onClick={() => setModalOpen(true)}>
             {t.signIn}
