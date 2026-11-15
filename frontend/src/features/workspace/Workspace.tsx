@@ -60,7 +60,7 @@ function Canvas() {
 }
 
 function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
-  const { panels } = useWorkspace();
+  const { panels, collapsed } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const anyOpen = panels.browser || panels.inspector;
 
@@ -89,10 +89,22 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
           }}
         />
       ) : null}
-      <Dock side="left" panel="browser" open={panels.browser} drawerLayout={drawerLayout}>
+      <Dock
+        side="left"
+        panel="browser"
+        open={panels.browser}
+        collapsed={collapsed.browser}
+        drawerLayout={drawerLayout}
+      >
         <BrowserPanel />
       </Dock>
-      <Dock side="right" panel="inspector" open={panels.inspector} drawerLayout={drawerLayout}>
+      <Dock
+        side="right"
+        panel="inspector"
+        open={panels.inspector}
+        collapsed={collapsed.inspector}
+        drawerLayout={drawerLayout}
+      >
         <InspectorPanel />
       </Dock>
     </>
@@ -103,17 +115,21 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
  * lg+: panel floats over the map at a fixed width. Below lg: off-canvas drawer toggled from the
  * top bar, closed with Escape or the scrim. Opening a drawer moves focus to its heading; closing it
  * returns focus to its top-bar toggle unless an in-panel action already moved focus elsewhere.
+ * A collapsed panel (lg+) keeps its top edge and drops its bottom anchor so it hugs the header.
  */
 function Dock({
   side,
   panel,
   open,
+  collapsed,
   drawerLayout,
   children,
 }: {
   readonly side: "left" | "right";
   readonly panel: PanelId;
   readonly open: boolean;
+  /** lg+ only: the panel is folded to its header, so the dock shrinks to fit it. */
+  readonly collapsed: boolean;
   readonly drawerLayout: boolean;
   readonly children: ReactNode;
 }) {
@@ -144,7 +160,7 @@ function Dock({
     <div
       ref={ref}
       id={`dock-${panel}`}
-      className={`absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:bottom-3 lg:top-3 ${width} ${position} ${
+      className={`absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:top-3 ${collapsed ? "lg:bottom-auto" : "lg:bottom-3"} ${width} ${position} ${
         open ? "max-lg:translate-x-0" : `${hidden} max-lg:invisible`
       }`}
     >
