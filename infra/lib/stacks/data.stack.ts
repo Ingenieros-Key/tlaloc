@@ -33,6 +33,7 @@ const triggerBundlingExternals = [
 /** Stateful stack: DynamoDB profiles table, media bucket, Cognito user pool, SES domain identity. */
 export class DataStack extends Stack {
   public readonly profilesTable: dynamodb.Table;
+  public readonly plotsTable: dynamodb.Table;
   public readonly mediaBucket: s3.Bucket;
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
@@ -49,6 +50,16 @@ export class DataStack extends Stack {
     this.profilesTable = new dynamodb.Table(this, "ProfilesTable", {
       tableName: dataConfig.profilesTableName,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy,
+    });
+
+    // Saved land plots per user (signed-in accounts): userId partition, plotId sort key.
+    this.plotsTable = new dynamodb.Table(this, "PlotsTable", {
+      tableName: dataConfig.plotsTableName,
+      partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "plotId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
       removalPolicy,
