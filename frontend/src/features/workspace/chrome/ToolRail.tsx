@@ -12,7 +12,7 @@ const s = t.chrome.rail;
 
 /**
  * Left tool rail: one icon per tool, each opening its own flyout beside the rail (a drawer below
- * lg). Plots first, then the five view modes. Pressing a view mode switches the map to it and
+ * lg). Plots first, then the five view modes, led by the Crop score. Pressing a view mode switches the map to it and
  * opens its controls; pressing the tool that is already open closes the flyout, leaving the map
  * to itself. The active view mode stays marked while its flyout is closed.
  */

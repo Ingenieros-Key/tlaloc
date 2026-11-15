@@ -1,4 +1,4 @@
-import type { ConditionId, HarvestResult, LastCrop, Priority, RotationCrop, SeasonName, StubbleUse } from "../data/rotation";
+import type { ConditionId, LastCrop, Priority, RotationCrop, SeasonName } from "../data/rotation";
 
 const MONTHS = [
   "January",
@@ -25,7 +25,7 @@ function ordinal(n: number): string {
  * Spanish rule sheet (reglas_rotacion); a Spanish set would restore the sheet's own wording.
  */
 export const rotation = {
-  tabs: { label: "Results", outlook: "Outlook", rotation: "Rotation" },
+  tabs: { label: "Results", outlook: "Outlook", rotation: "Rotation", climate: "Climate" },
   months: MONTHS,
   monthsShort: MONTHS_SHORT,
   /** 1-based month. */
@@ -72,7 +72,7 @@ export const rotation = {
     rule: "Rule",
     nasa: "NASA",
     you: "You",
-    fit: (rating: string) => `climate fit over the last 12 months: ${rating.toLowerCase()}`,
+    fit: (rating: string) => `climate fit, 5-year average: ${rating.toLowerCase()}`,
     fitPoor: "the climate here is a poor fit. Check before sowing.",
     moved: (priority: Priority, rank: string) =>
       `moved up ${{ soil: "for soil health", water: "to save water", harvest: "for the harvest" }[priority]}. The sheet lists it as ${rank}.`,
@@ -129,13 +129,6 @@ export const rotation = {
     offSeasonHint: "That is a dry-season sowing. The rotation continues with the next Primera.",
     harvested: "Is it harvested?",
     harvestedOptions: { yes: "Yes", no: "Still in the field" },
-    optional: "Optional",
-    harvest: "How was the harvest?",
-    harvestOptions: { good: "Good", regular: "Regular", poor: "Poor" } satisfies Record<HarvestResult, string>,
-    stubble: "What happened to the stubble?",
-    stubbleOptions: { left: "Left on soil", removed: "Removed", burned: "Burned" } satisfies Record<StubbleUse, string>,
-    earlier: "What did you plant before that?",
-    earlierNone: "Not sure, or nothing",
     caneYears: "How many years has the cane stood?",
     caneYear: (n: number) => (n >= 6 ? "6 or more" : String(n)),
     renewing: "Is the field finished or being renewed?",
@@ -155,9 +148,10 @@ export const rotation = {
     title: "Rotation plans",
     close: "Close rotation plans",
     rain: "Rain by month",
-    rainSource: "NASA, last 12 months",
+    rainSource: "NASA, expected (5-year average)",
     rainLoading: "Loading rainfall",
-    rainLabel: (wettest: string, driest: string) => `Monthly rainfall at the plot: wettest in ${wettest}, driest in ${driest}`,
+    rainLabel: (wettest: string, driest: string) =>
+      `Expected monthly rainfall at the plot (5-year average): wettest in ${wettest}, driest in ${driest}`,
     today: "Today",
     planted: "Outlined: what you planted",
     lane: (n: number) => `Plan ${n}`,

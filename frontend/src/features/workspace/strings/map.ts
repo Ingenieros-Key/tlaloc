@@ -30,6 +30,17 @@ export const map = {
   },
   dryDay: (max: string) => `No rain this day · max ${max} mm`,
   plotReading: (day: string) => `on ${day}`,
+  /** The wet/dry season card at the top of the map. */
+  season: {
+    wet: "Rainy season",
+    dry: "Dry season",
+    usual: (month: string, mm: string) => `${month}: ${mm} mm usual`,
+    country: (month: string) => `${month} in El Salvador`,
+    ends: (month: string) => `rains ease in ${month}`,
+    returns: (month: string) => `rains return in ${month}`,
+    hintPlot: "From this plot's 2021–2025 monthly rainfall. A month with 100 mm or more counts as wet.",
+    hintCountry: "El Salvador's usual rainy season, May to October. Draw a plot to use its own rainfall.",
+  },
   tooltip: {
     outsideRange: "Outside filter range",
     powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,

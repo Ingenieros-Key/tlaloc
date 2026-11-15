@@ -8,6 +8,7 @@ import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
 import { Segmented } from "../ui/Segmented";
+import { ClimateTab } from "./ClimateTab";
 import { CropCard } from "./CropCard";
 import { DisplayPanel } from "./DisplayPanel";
 import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
@@ -64,12 +65,15 @@ export function InspectorPanel() {
                 options={[
                   { value: "outlook", label: t.rotation.tabs.outlook },
                   { value: "rotation", label: t.rotation.tabs.rotation },
+                  { value: "climate", label: t.rotation.tabs.climate },
                 ]}
                 onChange={(tab) => dispatch({ type: "setInspectorTab", tab })}
               />
             </div>
             {inspectorTab === "rotation" ? (
               <RotationTab />
+            ) : inspectorTab === "climate" ? (
+              <ClimateTab />
             ) : (
               <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<ModelNotice align="end" />}>
                 <Outlook analysis={analysis} />

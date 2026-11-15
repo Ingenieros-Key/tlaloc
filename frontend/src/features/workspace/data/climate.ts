@@ -82,14 +82,17 @@ export function climateField(data: readonly PowerLocation[], factor: ClimateFact
   );
 }
 
-/** The plot's request: every factor's monthly and annual values at the point, for the years. */
+/**
+ * The plot's request: every factor's monthly and annual values at the point, from the first averaged
+ * year through the current one (whose published months are the cycles' most recent values).
+ */
 export function climatePointQuery([lng, lat]: readonly [number, number], range: ClimateYears) {
   return powerMonthlyPointQuery({
     parameters: CLIMATE_FACTORS.map((f) => CLIMATE_PARAMETERS[f]).sort(),
     longitude: lng,
     latitude: lat,
     start: String(range.first),
-    end: String(range.last),
+    end: String(range.last + 1),
   });
 }
 

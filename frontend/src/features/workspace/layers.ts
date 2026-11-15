@@ -145,8 +145,8 @@ export const MUTED_CELL: Rgba = [158, 176, 204, 28];
 /** A value scale: what `rampColor` and `rampGradient` need of a layer. */
 export type ColorScale = Pick<LayerDef, "domain" | "ramp">;
 
-/** View modes, in the order the Browser lists them. */
-export const VIEW_MODES: readonly ViewMode[] = ["single", "compare", "blend", "columns", "score"];
+/** View modes, in the order the tool rail lists them: the Crop score first. */
+export const VIEW_MODES: readonly ViewMode[] = ["score", "single", "compare", "blend", "columns"];
 
 /** Modes that draw the active layer together with a second one. */
 export function isTwoLayerMode(mode: ViewMode): boolean {

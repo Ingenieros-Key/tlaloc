@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { QueryProvider } from "@/lib/query";
 import { useEffect, useRef, type ReactNode } from "react";
 import { NavBar } from "./chrome/NavBar";
+import { SeasonCard } from "./chrome/SeasonCard";
 import { PlotUndoToast } from "./chrome/PlotUndoToast";
 import { RotationLanes } from "./chrome/RotationLanes";
 import { TimelineDock } from "./chrome/TimelineDock";
@@ -58,6 +59,9 @@ function Canvas() {
         <MapView />
       </div>
       <ToolRail inert={covered} />
+      <div inert={covered} className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-20">
+        <SeasonCard />
+      </div>
       <Drawers drawerLayout={drawerLayout} />
       <AnalysisAnnouncer />
       <div

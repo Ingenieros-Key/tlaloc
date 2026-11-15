@@ -14,15 +14,13 @@ import {
 } from "react";
 import { computeAssessment } from "./data/assessment";
 import { summarizePlot } from "./data/plot";
-import { monthlyTotals, type Planting, type Priority } from "./data/rotation";
+import type { Planting, Priority } from "./data/rotation";
 import { readSavedPlot, writeSavedPlot } from "./data/saved";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   DEFAULT_PRESET_DAYS,
   buildLayerFrames,
   latestWindow,
-  PRECIP_PARAMETER,
-  pointQuery,
   layerRegionalQuery,
   presetRange,
   type PrecipFrames,
@@ -37,6 +35,7 @@ import {
   climateYears,
   type Climate,
 } from "./data/climate";
+import { climateCycles, type ClimateCycles } from "./data/cycles";
 import { elevationQuery } from "./data/elevation";
 import { buildScoreField, type ScoreField } from "./data/score";
 import { LAYER_ORDER, defaultLayerSettings, isPowerLayer, isTwoLayerMode } from "./layers";
@@ -63,7 +62,7 @@ import type {
 export type PanelId = "browser" | "inspector";
 
 /** Which of the plot's results the Inspector shows: the planting outlook or the rotation. */
-export type InspectorTab = "outlook" | "rotation";
+export type InspectorTab = "outlook" | "rotation" | "climate";
 
 /** Seasons the rotation looks ahead: by default, and after "Show later seasons". */
 export const ROTATION_SEASONS = { short: 4, long: 6 } as const;
@@ -158,8 +157,13 @@ export type WorkspaceState = {
   readonly rotationSeasons: number;
   /** The plan lanes dock is open; it takes the timeline's place (see `lanesVisible`). */
   readonly lanesOpen: boolean;
-  /** Rainfall per calendar month (0 = January) at the plot over the last 12 months; null until loaded. */
+  /**
+   * Expected rainfall per calendar month (0 = January) at the plot: each month's average over the
+   * climate years (the projection the rotation's rain bars show). Null until loaded.
+   */
   readonly plotRain: readonly number[] | null;
+  /** The plot's monthly climate cycles and projection (the Climate tab); see `PlotCycles`. */
+  readonly plotCycles: PlotCycles;
   readonly analysis: AnalysisState;
   /** Bumped by "Analyze" to force a re-run on the same plot. */
   readonly analysisNonce: number;
@@ -184,7 +188,7 @@ export type WorkspaceState = {
 /** What the reducer owns: everything except state derived from queries. */
 type ReducerState = Omit<
   WorkspaceState,
-  "layerData" | "layerDataB" | "timelineLayer" | "timelineData" | "scoreData" | "plotRain"
+  "layerData" | "layerDataB" | "timelineLayer" | "timelineData" | "scoreData" | "plotRain" | "plotCycles"
 >;
 
 export type WorkspaceAction =
@@ -626,7 +630,14 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   const layerData = useLayerQuery(scoring ? null : state.activeLayer, range);
   const layerDataB = useLayerQuery(isTwoLayerMode(state.viewMode) ? state.secondLayer : null, range);
   const scoreData = useScoreData(scoring, state.scoreCrop);
-  const plotRain = usePlotMonthlyRain(state.plotSummary?.centroid ?? null);
+  const plotCycles = useMemo<PlotCycles>(
+    () => (plotClimate.status === "ready" ? { status: "ready", cycles: plotClimate.cycles } : { status: plotClimate.status }),
+    [plotClimate],
+  );
+  const plotRain = useMemo(
+    () => (plotCycles.status === "ready" ? plotCycles.cycles.factors.rain.mean.map((v) => v ?? 0) : null),
+    [plotCycles],
+  );
   // Elevation has no days: as the active layer of a two-layer view, the timeline follows the other.
   const { activeLayer, secondLayer, viewMode } = state;
   const timelineFromB = activeLayer === "elevation" && isTwoLayerMode(viewMode) && isPowerLayer(secondLayer);
@@ -637,8 +648,8 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
       : null;
   const timelineData = timelineFromB ? layerDataB : layerData;
   const value = useMemo<WorkspaceState>(
-    () => ({ ...state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain }),
-    [state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain],
+    () => ({ ...state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain, plotCycles }),
+    [state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain, plotCycles],
   );
 
   const { precipPlaying, precipSpeed } = state;
@@ -779,7 +790,12 @@ function useScoreData(enabled: boolean, crop: CropId): ScoreState {
 /** The plot's climate: the average of the last complete years, from NASA POWER. */
 type PlotClimate =
   | { readonly status: "none" | "loading" | "error" }
-  | { readonly status: "ready"; readonly climate: Climate };
+  | { readonly status: "ready"; readonly climate: Climate; readonly cycles: ClimateCycles };
+
+/** The plot's monthly cycles: "none" without a plot. */
+export type PlotCycles =
+  | { readonly status: "none" | "loading" | "error" }
+  | { readonly status: "ready"; readonly cycles: ClimateCycles };
 
 /** Plot centres are rounded to ~5 km: POWER's cells are ~55 km, so small edits reuse the answer. */
 function roundForClimate(value: number): number {
@@ -804,28 +820,12 @@ function usePlotClimate(center: readonly [number, number] | null): PlotClimate {
     if (lng === null) return { status: "none" };
     if (data) {
       const climate = climateAt(data.data, years);
-      return climate.years.length > 0 ? { status: "ready", climate } : { status: "error" };
+      return climate.years.length > 0
+        ? { status: "ready", climate, cycles: climateCycles(data.data, years) }
+        : { status: "error" };
     }
     return isError ? { status: "error" } : { status: "loading" };
   }, [lng, data, isError, years]);
-}
-
-/** Days the rotation's rainfall bars look back over. */
-const RAIN_BAR_DAYS = 365;
-
-/**
- * Rainfall per calendar month at the plot over the last 12 months (the rotation's season axis):
- * recent seasons, unlike the outlook's multi-year average. Null until loaded.
- */
-function usePlotMonthlyRain(center: readonly [number, number] | null): readonly number[] | null {
-  const [range] = useState(() => presetRange(RAIN_BAR_DAYS));
-  const lng = center ? roundForClimate(center[0]) : null;
-  const lat = center ? roundForClimate(center[1]) : null;
-  const { data } = useQuery({
-    ...pointQuery([lng ?? 0, lat ?? 0], range, [PRECIP_PARAMETER]),
-    enabled: lng !== null && lat !== null,
-  });
-  return useMemo(() => (lng !== null && data ? monthlyTotals(data.data.series[PRECIP_PARAMETER]) : null), [lng, data]);
 }
 
 export function useWorkspace(): WorkspaceState {
