@@ -16,7 +16,7 @@ export function TopBar() {
   return (
     <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-2 border-b border-line bg-bg px-3">
       <div className="flex shrink-0 items-center gap-2">
-        <Image src="/tlaloc-mark.svg" alt="" width={22} height={22} className="size-[22px]" unoptimized />
+        <Image src="/tlaloc-mascot.png" alt="" width={22} height={22} className="size-[22px]" unoptimized />
         <h1 className="font-display text-base font-semibold tracking-wide text-text max-[359px]:sr-only">{t.common.appName}</h1>
       </div>
       <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line sm:block" />

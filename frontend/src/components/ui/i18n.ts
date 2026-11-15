@@ -8,6 +8,8 @@ export const landingCopy: Record<Lang, {
   signIn: string;
   signedIn: string;
   signOut: string;
+  workspace: string;
+  theme: string;
 }> = {
   en: {
     tag: "NASA Space Apps 2026",
@@ -17,6 +19,8 @@ export const landingCopy: Record<Lang, {
     signIn: "Sign in",
     signedIn: "Signed in",
     signOut: "Sign out",
+    workspace: "Open workspace",
+    theme: "Toggle theme",
   },
   es: {
     tag: "NASA Space Apps 2026",
@@ -26,6 +30,8 @@ export const landingCopy: Record<Lang, {
     signIn: "Iniciar sesión",
     signedIn: "Sesión iniciada",
     signOut: "Cerrar sesión",
+    workspace: "Abrir workspace",
+    theme: "Cambiar tema",
   },
 };
 
