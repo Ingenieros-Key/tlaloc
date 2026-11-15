@@ -23,9 +23,13 @@ const css = `
   --piedra: #9aa3c7;
   --obsidiana: #060818;
 }
-.tl-auth { position: absolute; top: 1.25rem; left: 1.25rem; }
+.tl-topleft { position: absolute; top: 1.25rem; left: 1.25rem; z-index: 2; }
+.tl-topright { position: absolute; top: 1.25rem; right: 1.25rem; z-index: 2; display: flex; align-items: center; gap: 0.75rem; }
+.tl-brand { display: inline-flex; align-items: center; gap: 0.55rem; }
+.tl-brand img { width: 40px; height: 40px; }
+.tl-brand span { font-family: var(--font-chakra), sans-serif; font-weight: 700; font-size: 1.3rem; color: var(--hueso); letter-spacing: 0.02em; }
+.tl-hero-gif { width: min(360px, 82vw); height: auto; border-radius: 16px; display: block; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
 .tl-lang {
-  position: absolute; top: 1.25rem; right: 1.25rem;
   display: inline-flex; border: 1px solid rgba(154,163,199,0.4);
   border-radius: 999px; overflow: hidden;
   font-family: var(--font-plex-mono), monospace; font-size: 0.8rem;
@@ -108,10 +112,27 @@ export default function Home() {
     <div className="tl-root">
       <style>{css}</style>
 
-      <div className="tl-auth">
+      <div className="tl-topleft">
         {auth === "loading" ? (
           <img src="/tlaloc-loader.svg" alt="" aria-hidden width={32} height={32} />
         ) : auth === "in" ? (
+          <div className="tl-brand">
+            <img src="/tlaloc-mark.svg" alt="Tlaloc" />
+            <span>Tlaloc</span>
+          </div>
+        ) : (
+          <button type="button" className="tl-signin" onClick={() => setModalOpen(true)}>
+            {t.signIn}
+          </button>
+        )}
+      </div>
+
+      <div className="tl-topright">
+        <div className="tl-lang" role="group" aria-label="Language">
+          <button data-lang="es" aria-pressed={lang === "es"} onClick={() => setLang("es")}>ES</button>
+          <button data-lang="en" aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
+        </div>
+        {auth === "in" && (
           <button
             type="button"
             className="tl-chip"
@@ -130,21 +151,18 @@ export default function Home() {
               <path d="M21 12H9" />
             </svg>
           </button>
-        ) : (
-          <button type="button" className="tl-signin" onClick={() => setModalOpen(true)}>
-            {t.signIn}
-          </button>
         )}
       </div>
 
-      <div className="tl-lang" role="group" aria-label="Language">
-        <button data-lang="es" aria-pressed={lang === "es"} onClick={() => setLang("es")}>ES</button>
-        <button data-lang="en" aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
-      </div>
-
       <main className="tl-main">
-        <img className="tl-mark" src="/tlaloc-mark.svg" alt="Tlaloc" />
-        <p className="tl-wordmark">Tlaloc</p>
+        {auth === "in" ? (
+          <img className="tl-hero-gif" src="/tlaloc-crop-cycle-loop.gif" alt="Ciclo de cultivo de Tlaloc · Tlaloc crop cycle" />
+        ) : (
+          <>
+            <img className="tl-mark" src="/tlaloc-mark.svg" alt="Tlaloc" />
+            <p className="tl-wordmark">Tlaloc</p>
+          </>
+        )}
         <span className="tl-tag">{t.tag}</span>
         <h1 className="tl-h1">{t.heading}</h1>
         <p className="tl-lead">{t.lead}</p>
