@@ -30,6 +30,24 @@
   color-scheme: dark;
 }
 
+/* Light theme: toggled by adding .tl-light-theme to <html> (see lib/theme.ts). */
+html.tl-light-theme {
+  --tl-bg: #f4f0e6;
+  --tl-surface: #ffffff;
+  --tl-surface-2: #f3f1ea;
+  --tl-surface-3: #e9e6db;
+  --tl-line: #d8d3c4;
+  --tl-line-strong: #bcb6a3;
+  --tl-text: #0b1033;
+  --tl-muted: #5b6178;
+  --tl-accent: #0a7268;
+  --tl-accent-strong: #1fc8b4;
+  --tl-on-accent: #ffffff;
+  --tl-overlay: rgb(244 240 230 / 0.72);
+
+  color-scheme: light;
+}
+
 @theme inline {
   --color-bg: var(--tl-bg);
   --color-surface: var(--tl-surface);
