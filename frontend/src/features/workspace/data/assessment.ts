@@ -1,12 +1,14 @@
 import { bbox, booleanPointInPolygon, centroid } from "@turf/turf";
-import { LAYERS, LAYER_ORDER } from "../layers";
+import { FACTOR_ORDER, LAYERS, SAMPLE_LAYER_ORDER } from "../layers";
 import type { Position } from "geojson";
 import type {
+  CropId,
+  FactorId,
+  FactorSource,
   Assessment,
   CropAssessment,
   FactorScore,
   GridCell,
-  LayerId,
   PlotFeature,
   Rating,
 } from "../types";
@@ -42,7 +44,12 @@ function cellUnder([lng, lat]: Position, grid: readonly GridCell[]): readonly Gr
   return hit ? [hit] : [];
 }
 
-function scoreFactor(layer: LayerId, value: number, crop: CropProfile): FactorScore {
+function scoreFactor(
+  layer: FactorId,
+  value: number,
+  crop: CropProfile,
+  source: FactorSource,
+): FactorScore {
   const [lo, hi] = crop.ideal[layer];
   const [dMin, dMax] = LAYERS[layer].domain;
   const tolerance = (dMax - dMin) * FACTOR_TOLERANCE;
@@ -50,7 +57,7 @@ function scoreFactor(layer: LayerId, value: number, crop: CropProfile): FactorSc
   const gap = position === "below" ? lo - value : position === "above" ? value - hi : 0;
   const score =
     position === "within" ? 100 : Math.min(99, Math.round(100 * Math.max(0, 1 - gap / tolerance)));
-  return { layer, value, score, position };
+  return { layer, value, score, position, source };
 }
 
 function rate(score: number): Rating {
@@ -59,9 +66,16 @@ function rate(score: number): Rating {
   return "poor";
 }
 
-function assessCrop(crop: CropProfile, means: Readonly<Record<LayerId, number>>): CropAssessment {
-  const factors = LAYER_ORDER.map((layer) => scoreFactor(layer, means[layer], crop));
-  const weighted = factors.reduce((sum, f) => sum + f.score * crop.weights[f.layer], 0);
+function assessCrop(
+  crop: CropProfile,
+  values: Readonly<Partial<Record<FactorId, number>>>,
+  sources: Readonly<Partial<Record<FactorId, FactorSource>>>,
+): CropAssessment {
+  const present = FACTOR_ORDER.filter((id) => values[id] !== undefined);
+  const factors = present.map((id) => scoreFactor(id, values[id] as number, crop, sources[id] ?? "sample"));
+  // Weights are renormalised over the factors that have a value (temperature has no sample fallback).
+  const weightSum = present.reduce((sum, id) => sum + crop.weights[id], 0);
+  const weighted = factors.reduce((sum, f) => sum + (f.score * crop.weights[f.layer]) / weightSum, 0);
   const lowest = factors.reduce((min, f) => (f.score < min.score ? f : min));
   const ceiling = lowest.score < 100 ? 99 : 100;
   const score = Math.max(0, Math.min(ceiling, Math.round(weighted)));
@@ -74,21 +88,43 @@ function assessCrop(crop: CropProfile, means: Readonly<Record<LayerId, number>>)
   };
 }
 
-/** Scores each crop for the plot from the mean SAMPLE values of the grid cells it covers. */
-export function computeAssessment(plot: PlotFeature, grid: readonly GridCell[]): Assessment {
+/** One crop's outlook from factor values (the Crop score view runs this for every cell). */
+export function scoreCrop(
+  crop: CropId,
+  values: Readonly<Partial<Record<FactorId, number>>>,
+  sources: Readonly<Partial<Record<FactorId, FactorSource>>> = {},
+): CropAssessment {
+  return assessCrop(CROPS[crop], values, sources);
+}
+
+/**
+ * Scores each crop for the plot from the mean values of the grid cells it covers. `measured`
+ * replaces sample values with NASA POWER ones where available (temperature, humidity, rainfall).
+ */
+export function computeAssessment(
+  plot: PlotFeature,
+  grid: readonly GridCell[],
+  measured: Partial<Record<FactorId, number>> = {},
+): Assessment {
   const cells = sampleCells(plot, grid);
   if (cells.length === 0) return { kind: "outside" };
 
-  const means = Object.fromEntries(
-    LAYER_ORDER.map((layer) => [
-      layer,
-      cells.reduce((sum, cell) => sum + cell.values[layer], 0) / cells.length,
-    ]),
-  ) as Record<LayerId, number>;
+  const values: Partial<Record<FactorId, number>> = {};
+  const sources: Partial<Record<FactorId, FactorSource>> = {};
+  for (const layer of SAMPLE_LAYER_ORDER) {
+    values[layer] = cells.reduce((sum, cell) => sum + cell.values[layer], 0) / cells.length;
+    sources[layer] = "sample";
+  }
+  for (const id of FACTOR_ORDER) {
+    const value = measured[id];
+    if (value === undefined) continue;
+    values[id] = value;
+    sources[id] = "nasa";
+  }
 
   return {
     kind: "ok",
     cellsSampled: cells.length,
-    crops: CROP_ORDER.map((id) => assessCrop(CROPS[id], means)),
+    crops: CROP_ORDER.map((id) => assessCrop(CROPS[id], values, sources)),
   };
 }

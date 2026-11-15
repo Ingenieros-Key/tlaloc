@@ -1,4 +1,4 @@
-import { ChevronUp } from "lucide-react";
+import { ChevronUp, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type PanelCollapse = {
@@ -25,6 +25,7 @@ export function Panel({
   children,
   labelledBy,
   collapse,
+  close,
   className = "",
 }: {
   readonly title: string;
@@ -32,6 +33,8 @@ export function Panel({
   /** id for the heading so the region/dialog can reference it. */
   readonly labelledBy: string;
   readonly collapse?: PanelCollapse;
+  /** Adds a close button to the header (e.g. for a toolbox like Display). */
+  readonly close?: { readonly label: string; readonly onClose: () => void };
   readonly className?: string;
 }) {
   const collapsed = collapse?.collapsed === true;
@@ -52,7 +55,7 @@ export function Panel({
         <h2
           id={labelledBy}
           tabIndex={-1}
-          className="select-none font-display text-xs font-semibold uppercase tracking-[0.12em] text-muted"
+          className="mr-auto select-none font-display text-xs font-semibold uppercase tracking-[0.12em] text-muted"
         >
           {title}
         </h2>
@@ -71,6 +74,17 @@ export function Panel({
               strokeWidth={1.75}
               className={`size-4 transition-transform duration-200 ease-out ${collapsed ? "rotate-180" : ""}`}
             />
+          </button>
+        ) : null}
+        {close ? (
+          <button
+            type="button"
+            aria-label={close.label}
+            title={close.label}
+            onClick={close.onClose}
+            className="-ml-1.5 inline-flex size-8 max-lg:size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:bg-surface-3 hover:text-text"
+          >
+            <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
           </button>
         ) : null}
       </header>
@@ -98,7 +112,7 @@ export function PanelGroup({
     <div className="border-b border-line last:border-b-0">
       <div className="flex h-9 items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted">
         <span>{label}</span>
-        {count !== undefined ? <span className="tabular font-mono text-muted/80">{count}</span> : null}
+        {count !== undefined ? <span className="tabular font-mono text-muted">{count}</span> : null}
       </div>
       <div className="pb-2">{children}</div>
     </div>

@@ -1,4 +1,4 @@
-import type { CropId, LayerId } from "../types";
+import type { CropId, FactorId } from "../types";
 
 /** Inclusive ideal band for one layer, in that layer's units. */
 type IdealBand = readonly [number, number];
@@ -6,13 +6,15 @@ type IdealBand = readonly [number, number];
 /** Agronomic profile of a crop: the band where each factor is ideal and how much it matters. */
 export type CropProfile = {
   readonly id: CropId;
-  readonly ideal: Readonly<Record<LayerId, IdealBand>>;
+  readonly ideal: Readonly<Record<FactorId, IdealBand>>;
   /** Relative importance of each factor; sums to 1. */
-  readonly weights: Readonly<Record<LayerId, number>>;
+  readonly weights: Readonly<Record<FactorId, number>>;
+  /** A placeholder profile, not yet reviewed against local agronomy; the UI says so. */
+  readonly sample?: boolean;
 };
 
 /** Display and evaluation order of crops. */
-export const CROP_ORDER: readonly CropId[] = ["corn", "beans", "sorghum"];
+export const CROP_ORDER: readonly CropId[] = ["corn", "beans", "sorghum", "sugarcane"];
 
 /**
  * Sample crop profiles (plausible, simplified agronomy for El Salvador lowlands and mid-elevations).
@@ -20,24 +22,33 @@ export const CROP_ORDER: readonly CropId[] = ["corn", "beans", "sorghum"];
  * - Beans: shorter season, sensitive to waterlogging and fungal disease, so excess rain hurts.
  * - Sorghum: the drought-tolerant option, accepts drier air, lower rainfall and poorer soils.
  * Rainfall carries the highest weight for every crop because it is the main constraint on rain-fed
- * farms. Tuned so each crop is the best match somewhere on the sample grid (roughly corn 65%,
- * beans 23%, sorghum 13% of cells).
+ * farms. Corn, beans and sorghum were tuned so each is the best match somewhere on the sample grid.
+ * - Sugarcane: a multi-year crop of the warm, wet lowlands. Its profile is a placeholder added for
+ *   the rotation planner (`sample`), so its card is labelled as one.
  */
 export const CROPS: Readonly<Record<CropId, CropProfile>> = {
+  // Temperature bands are 12-month mean air temperature (°C): beans prefer the cooler highlands,
+  // sorghum the hot lowlands, corn sits in between.
   corn: {
     id: "corn",
-    ideal: { humidity: [62, 88], rain: [1650, 2200], soil: [55, 100] },
-    weights: { humidity: 0.25, rain: 0.4, soil: 0.35 },
+    ideal: { temp: [20, 30], humidity: [62, 88], rain: [1650, 2200], soil: [55, 100] },
+    weights: { temp: 0.2, humidity: 0.2, rain: 0.32, soil: 0.28 },
   },
   beans: {
     id: "beans",
-    ideal: { humidity: [52, 74], rain: [1350, 1800], soil: [45, 90] },
-    weights: { humidity: 0.25, rain: 0.4, soil: 0.35 },
+    ideal: { temp: [17, 26], humidity: [52, 74], rain: [1350, 1800], soil: [45, 90] },
+    weights: { temp: 0.25, humidity: 0.2, rain: 0.3, soil: 0.25 },
   },
   sorghum: {
     id: "sorghum",
-    ideal: { humidity: [40, 66], rain: [1100, 1550], soil: [25, 100] },
-    weights: { humidity: 0.3, rain: 0.4, soil: 0.3 },
+    ideal: { temp: [24, 34], humidity: [40, 66], rain: [1100, 1550], soil: [25, 100] },
+    weights: { temp: 0.15, humidity: 0.25, rain: 0.32, soil: 0.28 },
+  },
+  sugarcane: {
+    id: "sugarcane",
+    ideal: { temp: [23, 32], humidity: [68, 90], rain: [1700, 2400], soil: [60, 100] },
+    weights: { temp: 0.2, humidity: 0.15, rain: 0.35, soil: 0.3 },
+    sample: true,
   },
 };
 

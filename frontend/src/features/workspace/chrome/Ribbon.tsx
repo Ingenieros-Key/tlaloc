@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -82,7 +83,17 @@ export function Ribbon() {
 
   const selectTool = (next: Tool) => dispatch({ type: "setTool", tool: next });
   const deletePlot = () => dispatch({ type: "clearPlot" });
-  const analyze = () => dispatch({ type: "runAnalysis" });
+  const inFocus = state.focus;
+  /** Zooms to the plot and puts it in focus, which is what shows its results. */
+  const focusPlot = useCallback(() => {
+    controller.get()?.focusPlot();
+    dispatch({ type: "setFocus", focus: true });
+  }, [controller, dispatch]);
+  /** Re-runs the outlook; out of focus the results are not on screen, so focus comes with it. */
+  const analyze = useCallback(() => {
+    if (!inFocus) focusPlot();
+    dispatch({ type: "runAnalysis" });
+  }, [inFocus, focusPlot, dispatch]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -115,7 +126,7 @@ export function Ribbon() {
           break;
         case "a":
           if (!hasPlot || running || e.repeat) return;
-          dispatch({ type: "runAnalysis" });
+          analyze();
           break;
         default:
           return;
@@ -124,7 +135,7 @@ export function Ribbon() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dispatch, hasPlot, running, tool]);
+  }, [dispatch, hasPlot, running, tool, analyze]);
 
   useEffect(() => {
     const bar = barRef.current;
@@ -239,9 +250,16 @@ export function Ribbon() {
             id="focus"
             icon={Focus}
             label={s.focusPlot}
-            title={s.tooltip(s.focusPlotTip, undefined, hasPlot ? undefined : s.needsPlot)}
+            title={s.tooltip(state.focus ? s.exitFocusTip : s.focusPlotTip, undefined, hasPlot ? undefined : s.needsPlot)}
             disabled={!hasPlot}
-            onPress={() => controller.get()?.focusPlot()}
+            pressed={state.focus}
+            onPress={() => {
+              if (state.focus) {
+                dispatch({ type: "setFocus", focus: false });
+                return;
+              }
+              focusPlot();
+            }}
           />
         </RibbonGroup>
         <GroupDivider />
