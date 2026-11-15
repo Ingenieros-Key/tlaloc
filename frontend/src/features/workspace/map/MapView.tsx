@@ -3,7 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Layer, PickingInfo } from "@deck.gl/core";
 import { MapLibreOverlay } from "@deck.gl/maplibre";
-import { CloudOff, LoaderCircle, X } from "lucide-react";
+import { CloudOff, LoaderCircle, Sun, X } from "lucide-react";
 import {
   AttributionControl,
   Map as MapLibreMap,
@@ -12,7 +12,7 @@ import {
   type ErrorEvent as MapErrorEvent,
   type MapMouseEvent,
 } from "maplibre-gl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { TerraDraw } from "terra-draw";
 import type { Theme } from "@/lib/theme";
 import { useAppTheme } from "../hooks/useAppTheme";
@@ -115,6 +115,7 @@ function deckLayersFor(
   field: DataField | null,
   beforeId: string | undefined,
   globe: boolean,
+  theme: Theme,
 ): Layer[] {
   if (globe) return [];
   return buildDeckLayers({
@@ -123,6 +124,8 @@ function deckLayersFor(
     layerSettings: s.layerSettings,
     style: s.dataStyle,
     zoom: s.view.zoom,
+    // Satellite imagery is dark whatever the app theme.
+    theme: s.basemap === "satellite" ? "dark" : theme,
     beforeId,
     display: s.display,
   });
@@ -168,6 +171,14 @@ export function MapView() {
   const dayIndex = precipDayIndex(state);
   const frames = precip.status === "ready" ? precip.frames : null;
   const dayValues = frames?.values[dayIndex] ?? null;
+  /** Wettest cell of the day on screen, to say so when the whole country is dry. */
+  const dayMax = useMemo(() => {
+    if (!dayValues) return null;
+    let max = -Infinity;
+    for (const value of dayValues) if (value > max) max = value;
+    return Number.isFinite(max) ? max : null;
+  }, [dayValues]);
+  const dry = activeLayer === "precip" && display.data && dayMax !== null && dayMax < DRY_DAY_MM;
   const theme = useAppTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -246,7 +257,7 @@ export function MapView() {
     let moveFrame = 0;
 
     const currentLayers = () =>
-      deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current);
+      deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current, themeRef.current);
 
     // Globe flights. The intro starts in globe mode (set above); "Go to" enters it on demand.
     let introTimer = 0;
@@ -486,8 +497,15 @@ export function MapView() {
       if (e.originalEvent) endGlobe();
     };
 
+    // MapLibre opens the compact attribution on load; start it folded to its ⓘ button so it does not
+    // cover the map (it opens on click). Repeated once the map settles, in case sources added it late.
+    const foldAttribution = () =>
+      map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+    map.once("idle", foldAttribution);
+
     const onLoad = () => {
       window.clearTimeout(loadTimer);
+      foldAttribution();
       setLoaded(true);
       setNotice((current) => (current === "slow" ? null : current));
       publishView();
@@ -546,9 +564,9 @@ export function MapView() {
   const heatmapZoom = dataStyle === "heatmap" ? state.view.zoom : 0;
   useEffect(() => {
     overlayRef.current?.setProps({
-      layers: deckLayersFor(stateRef.current, fieldRef.current, beforeId, globeActive),
+      layers: deckLayersFor(stateRef.current, fieldRef.current, beforeId, globeActive, theme),
     });
-  }, [globeActive, activeLayer, layerSettings, dataStyle, heatmapZoom, beforeId, display]);
+  }, [globeActive, activeLayer, layerSettings, dataStyle, heatmapZoom, beforeId, display, theme, basemap]);
 
   // The selected day's values. While the timeline plays, the map blends from what is on screen to
   // the new day over one step, so playback moves continuously instead of jumping day to day.
@@ -556,7 +574,7 @@ export function MapView() {
   useEffect(() => {
     const push = () =>
       overlayRef.current?.setProps({
-        layers: deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current),
+        layers: deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current, themeRef.current),
       });
     const nextVersion = () => (fieldVersionRef.current += 1);
 
@@ -627,7 +645,7 @@ export function MapView() {
     drawRef.current = null;
     beforeIdRef.current = undefined;
     overlayRef.current?.setProps({
-      layers: deckLayersFor(stateRef.current, fieldRef.current, undefined, globeRef.current),
+      layers: deckLayersFor(stateRef.current, fieldRef.current, undefined, globeRef.current, theme),
     });
     map.setStyle(basemapStyle(basemap, theme), { diff: false });
   }, [basemap, theme]);
@@ -721,9 +739,26 @@ export function MapView() {
           }
         />
       ) : null}
+      {dry && loaded && !globeActive && dayMax !== null ? <DryDayChip max={dayMax} /> : null}
       {spinning ? <LoadingIndicator label={t.map.loading} /> : null}
       {switching ? <LoadingIndicator label={t.map.switchingBasemap} compact /> : null}
       {notice ? <LoadNotice kind={notice} onDismiss={() => setNotice(null)} /> : null}
+    </div>
+  );
+}
+
+/** Below this, nowhere in the country had measurable rain: the usual "rain day" cut-off. */
+const DRY_DAY_MM = 1;
+
+/** Says the map is on but dry, so near-empty cells are not mistaken for a missing layer. */
+function DryDayChip({ max }: { readonly max: number }) {
+  return (
+    <div
+      role="status"
+      className="pointer-events-none absolute left-1/2 top-3 z-[5] flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border border-input bg-surface/95 px-3 py-1 text-xs text-text shadow-md shadow-black/20"
+    >
+      <Sun aria-hidden="true" strokeWidth={1.75} className="size-3.5 text-muted" />
+      {t.map.dryDay(max.toLocaleString("en-US", { maximumFractionDigits: 1 }))}
     </div>
   );
 }

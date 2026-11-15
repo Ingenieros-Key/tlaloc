@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Eye, EyeOff, RotateCcw } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { LAYERS, isLiveLayer } from "../layers";
 import { useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
@@ -12,7 +12,7 @@ import { Segmented } from "../ui/Segmented";
 import { isDefaultSettings } from "./format";
 import { Legend } from "./Legend";
 import { OpacitySlider } from "./OpacitySlider";
-import { PrecipDetail, RetryButton } from "./PrecipDetail";
+import { RetryButton } from "./RetryButton";
 import { PrecipTimeline } from "./PrecipTimeline";
 import { RangeSlider } from "./RangeSlider";
 
@@ -25,6 +25,7 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
   const { activeLayer, layerSettings, display, precip, dataStyle } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   const layer = LAYERS[id];
   const settings = layerSettings[id];
@@ -32,6 +33,7 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
   const name = t.common.layers[id];
   const detailsId = `layer-${id}-details`;
   const hintId = `layer-${id}-hint`;
+  const optionsId = `layer-${id}-options`;
   const customized = !isDefaultSettings(layer, settings);
   const live = isLiveLayer(id);
 
@@ -121,34 +123,66 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
             {live && precip.status === "ready" ? (
               <p className="text-[11px] leading-snug text-muted">{t.browser.precip.resolution}</p>
             ) : null}
-            <OpacitySlider
-              opacity={settings.opacity}
-              onChange={(opacity) => dispatch({ type: "setLayerOpacity", layer: id, opacity })}
-            />
-            {dataStyle === "hexagons" ? (
-              <RangeSlider
-                layer={layer}
-                range={settings.range}
-                onChange={(range) => dispatch({ type: "setLayerRange", layer: id, range })}
-              />
-            ) : null}
-            {customized ? (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  aria-label={t.browser.resetLayer(name)}
-                  onClick={() => {
-                    dispatch({ type: "resetLayer", layer: id });
-                    triggerRef.current?.focus();
-                  }}
-                  className="inline-flex h-9 max-lg:h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/10"
-                >
-                  <RotateCcw aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
-                  {t.browser.reset}
-                </button>
+            {/* Display options: opacity and the value filter, folded away by default. */}
+            <div className="border-t border-line pt-1">
+              <button
+                type="button"
+                aria-expanded={optionsOpen}
+                aria-controls={optionsId}
+                onClick={() => setOptionsOpen((open) => !open)}
+                className="flex min-h-9 max-lg:min-h-11 w-full cursor-pointer items-center gap-2 rounded-md text-left text-xs"
+              >
+                <span className="font-medium text-text">{t.browser.displayOptions}</span>
+                <span className="ml-auto truncate text-muted">
+                  {customized ? t.browser.displayOptionsCustomized : t.browser.displayOptionsHint}
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  strokeWidth={1.75}
+                  className={`size-4 shrink-0 text-muted transition-transform duration-200 ${optionsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              <div
+                id={optionsId}
+                className={`grid ${
+                  optionsOpen
+                    ? "grid-rows-[1fr] [transition:grid-template-rows_200ms_cubic-bezier(0.2,0,0,1)]"
+                    : "invisible grid-rows-[0fr] [transition:grid-template-rows_200ms_cubic-bezier(0.2,0,0,1),visibility_0s_200ms]"
+                }`}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="space-y-3 pt-2">
+                    <OpacitySlider
+                      opacity={settings.opacity}
+                      onChange={(opacity) => dispatch({ type: "setLayerOpacity", layer: id, opacity })}
+                    />
+                    {dataStyle === "hexagons" ? (
+                      <RangeSlider
+                        layer={layer}
+                        range={settings.range}
+                        onChange={(range) => dispatch({ type: "setLayerRange", layer: id, range })}
+                      />
+                    ) : null}
+                    {customized ? (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          aria-label={t.browser.resetLayer(name)}
+                          onClick={() => {
+                            dispatch({ type: "resetLayer", layer: id });
+                            triggerRef.current?.focus();
+                          }}
+                          className="inline-flex h-9 max-lg:h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/10"
+                        >
+                          <RotateCcw aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
+                          {t.browser.reset}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            ) : null}
-            {live && active ? <PrecipDetail /> : null}
+            </div>
           </div>
         </div>
       </div>

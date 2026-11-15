@@ -5,6 +5,7 @@ import { QueryProvider } from "@/lib/query";
 import { useEffect, useRef, type ReactNode } from "react";
 import { NavBar } from "./chrome/NavBar";
 import { PlotUndoToast } from "./chrome/PlotUndoToast";
+import { TimelineDock } from "./chrome/TimelineDock";
 import { Ribbon } from "./chrome/Ribbon";
 import { TopBar } from "./chrome/TopBar";
 import { DRAWER_QUERY, useMediaQuery } from "./hooks/useMediaQuery";
@@ -56,6 +57,7 @@ function Canvas() {
         className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center px-4"
       >
         <PlotUndoToast />
+        <TimelineDock />
         {display.navBar ? <NavBar /> : null}
       </div>
     </main>

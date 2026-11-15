@@ -16,6 +16,9 @@ export const chrome = {
     signOut: "Sign out",
     home: "Home",
     theme: "Toggle theme",
+    menu: "Menu",
+    language: "Language",
+    themeLabel: "Theme",
   },
   ribbon: {
     label: "Workspace tools",

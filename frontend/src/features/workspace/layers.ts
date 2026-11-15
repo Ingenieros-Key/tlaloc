@@ -40,15 +40,15 @@ export const LAYERS: Readonly<Record<AnyLayerId, LayerDef>> = {
       [214, 246, 236, 255],
     ],
   },
-  // NASA POWER PRECTOTCORR for one day. Dry cells fade out so rain events stand out on either
-  // basemap; heavy days in El Salvador's rainy season reach 40-60 mm.
+  // NASA POWER PRECTOTCORR for one day. Dry cells stay faint (but visible, so the layer still reads
+  // as on) and rain events stand out on either basemap; heavy rainy-season days reach 40-60 mm.
   precip: {
     id: "precip",
     domain: [0, 40],
     unit: "mm",
     precision: 1,
     ramp: [
-      [120, 200, 240, 30],
+      [120, 200, 240, 72],
       [64, 160, 222, 170],
       [30, 100, 220, 225],
       [96, 64, 204, 255],

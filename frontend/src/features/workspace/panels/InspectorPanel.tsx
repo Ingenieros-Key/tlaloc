@@ -4,6 +4,7 @@ import { MapPinOff, SquareDashed } from "lucide-react";
 import type { ReactNode } from "react";
 import { focusMapCanvas } from "../map/focus";
 import { usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
+import { SampleDataNotice } from "../chrome/SampleDataNotice";
 import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
@@ -37,7 +38,7 @@ export function InspectorPanel() {
           {plotSummary ? <PlotFacts summary={plotSummary} analysis={analysis} /> : <EmptyPlot />}
         </Section>
         {plotSummary ? (
-          <Section id="inspector-outlook" heading={t.inspector.outlookHeading}>
+          <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<SampleDataNotice align="end" />}>
             <Outlook analysis={analysis} />
           </Section>
         ) : null}
@@ -49,18 +50,24 @@ export function InspectorPanel() {
 function Section({
   id,
   heading,
+  aside,
   children,
 }: {
   readonly id: string;
   readonly heading: string;
+  /** Shown at the end of the heading row (e.g. the sample-data notice). */
+  readonly aside?: ReactNode;
   readonly children: ReactNode;
 }) {
   const headingId = `${id}-heading`;
   return (
     <section aria-labelledby={headingId} className="px-3 py-3">
-      <h3 id={headingId} className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
-        {heading}
-      </h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 id={headingId} className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+          {heading}
+        </h3>
+        {aside}
+      </div>
       {children}
     </section>
   );

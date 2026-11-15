@@ -12,8 +12,9 @@ export function Segmented<T extends string>({
   showLabel = false,
 }: {
   readonly label: string;
-  readonly options: readonly { readonly value: T; readonly label: string }[];
-  readonly value: T;
+  readonly options: readonly { readonly value: T; readonly label: string; readonly ariaLabel?: string }[];
+  /** The selected option's value; one that matches no option leaves every button unpressed. */
+  readonly value: T | "";
   readonly onChange: (value: T) => void;
   /** Show `label` to the left of the control (otherwise it is only announced). */
   readonly showLabel?: boolean;
@@ -32,6 +33,7 @@ export function Segmented<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={selected}
+            aria-label={option.ariaLabel}
             onClick={() => onChange(option.value)}
             className={`h-7 max-lg:h-11 cursor-pointer truncate rounded px-2 text-xs font-medium transition-colors duration-150 ${
               selected ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"

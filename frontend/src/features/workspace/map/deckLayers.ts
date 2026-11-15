@@ -4,7 +4,7 @@ import { PathLayer, PolygonLayer, type PathLayerProps, type PolygonLayerProps } 
 import { LAYERS, MUTED_CELL, rampColor } from "../layers";
 import type { DataField, DataStyle, DisplaySettings, FieldCell, LayerId, LayerSettings, Rgba } from "../types";
 import { COUNTRY_RINGS } from "./geo";
-import { CELL_HIGHLIGHT, CELL_STROKE, OUTLINE_COLOR } from "./theme";
+import { CELL_HIGHLIGHT, CELL_STROKE, CELL_STROKE_DARK, OUTLINE_COLOR } from "./theme";
 
 /** deck.gl layer id of the active data layer (used to filter hover picks). */
 export const DATA_LAYER_ID = "tl-data";
@@ -29,6 +29,8 @@ type DeckLayerInput = {
   readonly style: DataStyle;
   /** Current map zoom; sizes the heatmap kernel to the grid spacing. */
   readonly zoom: number;
+  /** Basemap brightness, so the hexagon hairlines stay visible on the dark map. */
+  readonly theme: "light" | "dark";
   /** MapLibre layer the deck layers are inserted beneath (undefined = top of the style). */
   readonly beforeId: string | undefined;
   /** Display card switches that affect the deck layers. */
@@ -88,6 +90,7 @@ export function buildDeckLayers({
   layerSettings,
   style,
   zoom,
+  theme,
   beforeId,
   display,
 }: DeckLayerInput): Layer[] {
@@ -136,7 +139,7 @@ export function buildDeckLayers({
         stroked: display.borders,
         extruded: false,
         getFillColor: fillColor(activeLayer, settings, values),
-        getLineColor: withOpacity(CELL_STROKE, settings.opacity),
+        getLineColor: withOpacity(theme === "dark" ? CELL_STROKE_DARK : CELL_STROKE, settings.opacity),
         lineWidthUnits: "pixels",
         getLineWidth: 0.5,
         lineWidthMinPixels: 0.5,
@@ -145,7 +148,7 @@ export function buildDeckLayers({
         highlightColor: [...CELL_HIGHLIGHT],
         updateTriggers: {
           getFillColor: [activeLayer, version, settings.opacity, settings.range[0], settings.range[1]],
-          getLineColor: [settings.opacity],
+          getLineColor: [settings.opacity, theme],
         },
       };
       layers.push(new PolygonLayer<FieldCell>(dataProps));
