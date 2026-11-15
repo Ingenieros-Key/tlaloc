@@ -51,15 +51,26 @@ function RainPanel({ tagline }: { tagline: string }) {
             />
           );
         })}
-      <div className="relative z-10 flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
-        <motion.img
-          src="/tlaloc-mascot.png"
-          alt="Tlaloc"
-          className="h-28 w-28 drop-shadow-xl"
-          initial={{ scale: 0.8, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 180, damping: 16 }}
-        />
+      <div className="relative z-10 flex h-full flex-col items-center justify-center gap-6 p-8 text-center">
+        <div className="relative flex items-center justify-center">
+          <div
+            aria-hidden
+            className="absolute -z-10 h-56 w-56 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(31,200,180,0.40), rgba(246,185,59,0.14) 45%, transparent 72%)",
+              filter: "blur(10px)",
+            }}
+          />
+          <motion.img
+            src="/tlaloc-mascot.png"
+            alt="Tlaloc"
+            className="h-48 w-48 drop-shadow-2xl"
+            initial={{ scale: 0.8, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 180, damping: 16 }}
+          />
+        </div>
         <p className="max-w-[16rem] text-sm font-medium text-[#F4F0E6]/90">{tagline}</p>
       </div>
     </div>
@@ -183,25 +194,9 @@ export function AuthModal({
                   <h2 className="text-2xl font-bold text-gray-900">
                     {mode === "signup" ? t.signUpTitle : mode === "confirm" ? t.confirmTitle : t.signInTitle}
                   </h2>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {mode === "confirm" ? (
-                      t.confirmSub(form.email)
-                    ) : (
-                      <>
-                        {mode === "signup" ? t.signUpSub : t.signInSub}{" "}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMode(mode === "signup" ? "signin" : "signup");
-                            setError(null);
-                          }}
-                          className="font-medium text-[#1FC8B4] hover:underline"
-                        >
-                          {mode === "signup" ? t.toSignIn : t.toSignUp}
-                        </button>
-                      </>
-                    )}
-                  </p>
+                  {mode === "confirm" && (
+                    <p className="mt-1 text-sm text-gray-600">{t.confirmSub(form.email)}</p>
+                  )}
                 </motion.div>
               </AnimatePresence>
 
@@ -295,6 +290,22 @@ export function AuthModal({
                     t.submitSignIn
                   )}
                 </motion.button>
+
+                {mode !== "confirm" && (
+                  <p className="pt-1 text-center text-sm text-gray-600">
+                    {mode === "signup" ? t.signUpSub : t.signInSub}{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode(mode === "signup" ? "signin" : "signup");
+                        setError(null);
+                      }}
+                      className="font-medium text-[#1FC8B4] hover:underline"
+                    >
+                      {mode === "signup" ? t.toSignIn : t.toSignUp}
+                    </button>
+                  </p>
+                )}
               </form>
               </div>
             </div>
