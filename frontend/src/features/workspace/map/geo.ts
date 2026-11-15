@@ -133,7 +133,7 @@ export function cameraPadding(container: HTMLElement, inspector = true, browser 
   const small: PaddingOptions = { top: GAP, right: GAP, bottom: NAV_BAR_CLEARANCE, left: rail + GAP };
   if (!window.matchMedia(LG_QUERY).matches) return small;
   const left = PANEL_INSET + rail + (browser ? RAIL_GAP + cssPx("--tl-browser-w", 272) : 0) + GAP;
-  // The Inspector is only on screen with Display open or plot results (see inspectorVisible).
+  // The Inspector is only on screen with Display open or a plot in focus (see inspectorVisible).
   const right = inspector ? PANEL_INSET + cssPx("--tl-inspector-w", 328) + GAP : GAP;
   const fitsX = container.clientWidth - left - right >= MIN_VIEWPORT;
   const fitsY = container.clientHeight - GAP - NAV_BAR_CLEARANCE >= MIN_VIEWPORT;

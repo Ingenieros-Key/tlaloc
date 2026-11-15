@@ -351,6 +351,8 @@ export function MapView() {
         if (others.length > 0) draw.removeFeatures(others);
         plotIdRef.current = id;
         syncPlotFromDraw(id);
+        // A freshly drawn plot starts in focus, which is what shows its results.
+        dispatch({ type: "setFocus", focus: true });
         dispatch({ type: "setTool", tool: "pan" });
       } else if (id === plotIdRef.current) {
         syncPlotFromDraw(id);
@@ -463,8 +465,8 @@ export function MapView() {
 
     const fitPlot = (bounds: ReturnType<typeof plotBounds>) => {
       map.fitBounds(bounds, {
-        // A plot always brings up the Inspector with its results, even if this runs a moment before
-        // it renders, so leave room for it.
+        // Every caller puts the plot in focus, which brings up the Inspector with its results, even
+        // if this runs a moment before it renders, so leave room for it.
         padding: cameraPadding(container, true, browserVisible(stateRef.current)),
         maxZoom: PLOT_MAX_ZOOM,
         // Keep the user's rotation: fitBounds would otherwise snap back to north.
@@ -531,6 +533,7 @@ export function MapView() {
       const side = Math.min(KEYBOARD_PLOT_MAX_M, Math.max(KEYBOARD_PLOT_MIN_M, viewSide));
       const next = squareAround([center.lng, center.lat], side, map.getBearing());
       dispatch({ type: "setPlot", plot: next });
+      dispatch({ type: "setFocus", focus: true });
       dispatch({ type: "setTool", tool: "pan" });
       if (side !== viewSide) fitPlot(plotBounds(next));
     };
