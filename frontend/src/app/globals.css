@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
+/*
+ * Tlaloc design tokens. Dark-only for v1; every component consumes these via
+ * Tailwind utilities (bg-surface, text-muted, border-line, ...). Never use raw hex in components.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --tl-bg: #060818;
+  --tl-surface: #0b1033;
+  --tl-surface-2: #121845;
+  --tl-surface-3: #1a2158;
+  --tl-line: #262e66;
+  --tl-line-strong: #36408a;
+  --tl-text: #f4f0e6;
+  --tl-muted: #9aa3c7;
+  --tl-accent: #1fc8b4;
+  --tl-accent-strong: #0a7268;
+  --tl-on-accent: #060818;
+  --tl-indigo: #2b3a9e;
+  --tl-good: #5dbb63;
+  --tl-fair: #f6b93b;
+  --tl-poor: #f2724f;
+  --tl-overlay: rgb(6 8 24 / 0.72);
+
+  --tl-topbar-h: 44px;
+  --tl-ribbon-h: 72px;
+  --tl-browser-w: 272px;
+  --tl-inspector-w: 328px;
+
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--tl-bg);
+  --color-surface: var(--tl-surface);
+  --color-surface-2: var(--tl-surface-2);
+  --color-surface-3: var(--tl-surface-3);
+  --color-line: var(--tl-line);
+  --color-line-strong: var(--tl-line-strong);
+  --color-text: var(--tl-text);
+  --color-muted: var(--tl-muted);
+  --color-accent: var(--tl-accent);
+  --color-accent-strong: var(--tl-accent-strong);
+  --color-on-accent: var(--tl-on-accent);
+  --color-indigo: var(--tl-indigo);
+  --color-good: var(--tl-good);
+  --color-fair: var(--tl-fair);
+  --color-poor: var(--tl-poor);
+  --color-overlay: var(--tl-overlay);
+
+  --font-display: var(--font-chakra), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--tl-bg);
+  color: var(--tl-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tl-accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * MapLibre chrome restyled to match the workspace. The canvas fills an overflow-hidden box, so its
+ * focus ring is drawn inside the edge instead of outside where it would be clipped. maplibre-gl.css
+ * loads after this file (with the map chunk), so overrides use an extra class for specificity.
+ */
+.maplibregl-map .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--tl-accent);
+  outline-offset: -2px;
+}
+.maplibregl-ctrl-attrib {
+  background: var(--tl-surface) !important;
+  color: var(--tl-muted) !important;
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--tl-muted) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+.maplibregl-map .maplibregl-ctrl-top-right {
+  max-width: calc(100% - 24px);
+}
+/* lg+: keep the attribution between the floating Browser and Inspector panels. */
+@media (min-width: 1024px) {
+  .maplibregl-map .maplibregl-ctrl-top-right {
+    right: calc(var(--tl-inspector-w) + 24px);
+    max-width: calc(100% - var(--tl-browser-w) - var(--tl-inspector-w) - 48px);
+  }
 }

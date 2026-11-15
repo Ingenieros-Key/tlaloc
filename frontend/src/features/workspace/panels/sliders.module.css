@@ -1,0 +1,120 @@
+/*
+ * Range inputs for the Browser panel. Thumbs are 16px visible discs inside a transparent border
+ * that makes the hit area --thumb wide: 28px on desktop, 44px below lg where panels are touch
+ * drawers. Colors come from the design tokens only.
+ */
+
+.slider,
+.dualInput {
+  --thumb: 28px;
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: var(--thumb);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+@media (max-width: 1023.98px) {
+  .slider,
+  .dualInput {
+    --thumb: 44px;
+  }
+}
+
+/* Single-thumb slider: track filled up to the thumb centre for --pct (0..1). */
+.slider {
+  --fill: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--pct, 0));
+}
+.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    var(--tl-accent) 0 var(--fill, 0%),
+    var(--tl-line-strong) var(--fill, 0%) 100%
+  );
+}
+.slider::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--tl-line-strong);
+}
+.slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--tl-accent);
+}
+
+/* Dual-thumb slider: two overlaid inputs; only the thumbs take pointer events. */
+.dualInput {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dualInput::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+.dualInput::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+.dualInput::-moz-range-progress {
+  background: transparent;
+}
+
+.slider::-webkit-slider-thumb,
+.dualInput::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc(2px - var(--thumb) / 2);
+  border: calc((var(--thumb) - 16px) / 2) solid transparent;
+  border-radius: 9999px;
+  background-color: var(--tl-accent);
+  background-clip: padding-box;
+  cursor: grab;
+  pointer-events: auto;
+  transition: background-color 150ms ease-out;
+}
+.slider::-moz-range-thumb,
+.dualInput::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--thumb);
+  height: var(--thumb);
+  border: calc((var(--thumb) - 16px) / 2) solid transparent;
+  border-radius: 9999px;
+  background-color: var(--tl-accent);
+  background-clip: padding-box;
+  cursor: grab;
+  pointer-events: auto;
+  transition: background-color 150ms ease-out;
+}
+
+.slider:hover::-webkit-slider-thumb,
+.dualInput:hover::-webkit-slider-thumb,
+.slider:focus-visible::-webkit-slider-thumb,
+.dualInput:focus-visible::-webkit-slider-thumb {
+  background-color: var(--tl-text);
+}
+.slider:hover::-moz-range-thumb,
+.dualInput:hover::-moz-range-thumb,
+.slider:focus-visible::-moz-range-thumb,
+.dualInput:focus-visible::-moz-range-thumb {
+  background-color: var(--tl-text);
+}
+
+.slider:active::-webkit-slider-thumb,
+.dualInput:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+.slider:active::-moz-range-thumb,
+.dualInput:active::-moz-range-thumb {
+  cursor: grabbing;
+}
