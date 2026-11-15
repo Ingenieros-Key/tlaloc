@@ -29,7 +29,7 @@
   --tl-input: #5b78aa;
   --tl-overlay: rgb(5 11 22 / 0.72);
 
-  --tl-topbar-h: 52px;
+  --tl-topbar-h: 60px;
   --tl-ribbon-h: 72px;
   --tl-browser-w: 272px;
   /* The left tool rail: 44px buttons, 4px padding and a 1px border each side. */

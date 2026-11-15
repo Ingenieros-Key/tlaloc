@@ -60,9 +60,19 @@ export const navCopy: Record<Lang, {
   },
 };
 
+type StickerCopy = { title: string; body: string };
+
 export const aboutCopy: Record<
   Lang,
-  { title: string; tagline: string; intro: string; carey: string; disciplinesLabel: string; disciplines: string }
+  {
+    title: string;
+    tagline: string;
+    intro: string;
+    carey: string;
+    disciplinesLabel: string;
+    disciplines: string;
+    stickers: { tlaloc: StickerCopy; nasa: StickerCopy; flag: StickerCopy };
+  }
 > = {
   en: {
     title: "Our story",
@@ -74,6 +84,20 @@ export const aboutCopy: Record<
     disciplinesLabel: "Our disciplines",
     disciplines:
       "Business Engineering · Physics · Electrical Engineering · Computer Science · Aeronautical Engineering · Mechatronics Engineering Student",
+    stickers: {
+      tlaloc: {
+        title: "Why “Tlaloc”",
+        body: "Named after Tláloc, the Mesoamerican rain deity also honored by the Nahua-Pipil peoples of present-day El Salvador — our way of honoring Salvadoran mythology and the age-old link between rain and the harvest.",
+      },
+      nasa: {
+        title: "NASA Space Apps Challenge 2026",
+        body: "Tlaloc was built for the 2026 NASA International Space Apps Challenge, turning NASA open Earth-science data into practical tools for smallholder farmers.",
+      },
+      flag: {
+        title: "From across El Salvador",
+        body: "Our team comes from several places around the country — Armenia, San Salvador and Suchitoto among them.",
+      },
+    },
   },
   es: {
     title: "Nuestra historia",
@@ -85,6 +109,20 @@ export const aboutCopy: Record<
     disciplinesLabel: "Nuestras disciplinas",
     disciplines:
       "Ingeniería de Negocios · Física · Ingeniería Eléctrica · Ciencias de la Computación · Ingeniería Aeronáutica · Estudiante de Ingeniería Mecatrónica",
+    stickers: {
+      tlaloc: {
+        title: "¿Por qué “Tlaloc”?",
+        body: "En honor a Tláloc, deidad mesoamericana de la lluvia también venerada por los pueblos Nahua-Pipil del actual El Salvador — nuestra forma de honrar la mitología salvadoreña y el vínculo ancestral entre la lluvia y la cosecha.",
+      },
+      nasa: {
+        title: "NASA Space Apps Challenge 2026",
+        body: "Tlaloc nació para el NASA International Space Apps Challenge 2026, convirtiendo los datos abiertos de ciencia de la Tierra de la NASA en herramientas útiles para pequeños agricultores.",
+      },
+      flag: {
+        title: "De todo El Salvador",
+        body: "Nuestro equipo viene de varios lugares del país — entre ellos Armenia, San Salvador y Suchitoto.",
+      },
+    },
   },
 };
 
