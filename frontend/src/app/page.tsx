@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getCurrentUser, signOut } from "aws-amplify/auth";
 import "@/lib/amplify";
 import { AuthModal } from "@/components/ui/auth-modal";
@@ -90,6 +91,36 @@ const css = `
   font-size: 0.75rem; font-family: var(--font-plex-mono), monospace;
 }
 .tl-footer a { color: var(--jade); text-decoration: none; }
+.tl-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.25rem; height: 2.25rem; border-radius: 999px;
+  border: 1px solid rgba(154,163,199,0.4); background: transparent; color: var(--hueso);
+  cursor: pointer; transition: background 0.15s;
+}
+.tl-iconbtn:hover { background: rgba(154,163,199,0.15); }
+.tl-cta {
+  display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;
+  border: 1px solid var(--jade); background: transparent; color: var(--jade);
+  border-radius: 999px; padding: 0.6rem 1.4rem; cursor: pointer; text-decoration: none;
+  font-family: var(--font-plex-mono), monospace; font-size: 0.85rem; font-weight: 500;
+  letter-spacing: 0.04em; transition: background 0.15s, color 0.15s;
+}
+.tl-cta:hover { background: var(--jade); color: var(--obsidiana); }
+.tl-light {
+  color: #0b1033;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(31,200,180,0.20), transparent 60%),
+    radial-gradient(900px 500px at 85% 110%, rgba(246,185,59,0.22), transparent 60%),
+    #f4f0e6;
+}
+.tl-light .tl-wordmark, .tl-light .tl-h1, .tl-light .tl-brand span, .tl-light .tl-status { color: #0b1033; }
+.tl-light .tl-tag { color: #0a7268; }
+.tl-light .tl-lead { color: #5b6178; }
+.tl-light .tl-footer { color: rgba(11,16,51,0.55); }
+.tl-light .tl-lang { border-color: rgba(11,16,51,0.25); }
+.tl-light .tl-lang button { color: #5b6178; }
+.tl-light .tl-iconbtn { color: #0b1033; border-color: rgba(11,16,51,0.25); }
+.tl-light .tl-iconbtn:hover { background: rgba(11,16,51,0.08); }
 @media (prefers-reduced-motion: reduce) { .tl-dot { animation: none; } }
 `;
 
@@ -97,6 +128,7 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>("es");
   const [modalOpen, setModalOpen] = useState(false);
   const [auth, setAuth] = useState<"loading" | "in" | "out">("loading");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const t = landingCopy[lang];
 
   const refresh = () =>
@@ -106,10 +138,19 @@ export default function Home() {
 
   useEffect(() => {
     refresh();
+    const saved = localStorage.getItem("tl-theme");
+    if (saved === "light" || saved === "dark") setTheme(saved);
   }, []);
 
+  const toggleTheme = () =>
+    setTheme((p) => {
+      const next = p === "dark" ? "light" : "dark";
+      localStorage.setItem("tl-theme", next);
+      return next;
+    });
+
   return (
-    <div className="tl-root">
+    <div className={`tl-root${theme === "light" ? " tl-light" : ""}`}>
       <style>{css}</style>
 
       <div className="tl-topleft">
@@ -117,7 +158,7 @@ export default function Home() {
           <img src="/tlaloc-loader.svg" alt="" aria-hidden width={32} height={32} />
         ) : auth === "in" ? (
           <div className="tl-brand">
-            <img src="/tlaloc-mark.svg" alt="Tlaloc" />
+            <img src="/tlaloc-mascot.png" alt="Tlaloc" />
             <span>Tlaloc</span>
           </div>
         ) : (
@@ -128,6 +169,18 @@ export default function Home() {
       </div>
 
       <div className="tl-topright">
+        <button type="button" className="tl-iconbtn" onClick={toggleTheme} title={t.theme} aria-label={t.theme}>
+          {theme === "dark" ? (
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+            </svg>
+          )}
+        </button>
         <div className="tl-lang" role="group" aria-label="Language">
           <button data-lang="es" aria-pressed={lang === "es"} onClick={() => setLang("es")}>ES</button>
           <button data-lang="en" aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
@@ -159,7 +212,7 @@ export default function Home() {
           <img className="tl-hero-gif" src="/tlaloc-crop-cycle-loop.gif" alt="Ciclo de cultivo de Tlaloc · Tlaloc crop cycle" />
         ) : (
           <>
-            <img className="tl-mark" src="/tlaloc-mark.svg" alt="Tlaloc" />
+            <img className="tl-mark" src="/tlaloc-mascot.png" alt="Tlaloc" />
             <p className="tl-wordmark">Tlaloc</p>
           </>
         )}
@@ -170,6 +223,12 @@ export default function Home() {
           <span className="tl-dot" aria-hidden />
           <span>{t.building}</span>
         </span>
+        <Link className="tl-cta" href="/workspace">
+          {t.workspace}
+          <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </Link>
       </main>
 
       <footer className="tl-footer">

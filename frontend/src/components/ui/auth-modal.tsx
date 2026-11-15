@@ -53,7 +53,7 @@ function RainPanel({ tagline }: { tagline: string }) {
         })}
       <div className="relative z-10 flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
         <motion.img
-          src="/tlaloc-icon.svg"
+          src="/tlaloc-mascot.png"
           alt="Tlaloc"
           className="h-28 w-28 drop-shadow-xl"
           initial={{ scale: 0.8, opacity: 0, y: 10 }}
