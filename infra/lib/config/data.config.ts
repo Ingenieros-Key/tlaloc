@@ -4,6 +4,7 @@ import { baseConfig } from "@config/base.config";
 
 export const dataConfig: DataConfig = {
   profilesTableName: buildName("profiles"),
+  plotsTableName: buildName("plots"),
   mediaBucketName: buildName("media"),
   userPoolName: buildName("users"),
   userPoolClientName: buildName("users-web"),
