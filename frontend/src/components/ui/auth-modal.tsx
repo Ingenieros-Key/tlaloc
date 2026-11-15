@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { signIn, signUp, confirmSignUp } from "aws-amplify/auth";
 import "@/lib/amplify";
-import { authCopy, type Lang } from "./i18n";
+import { authCopy } from "./i18n";
+import { useLang } from "@/lib/i18n-store";
 
 type Mode = "signin" | "signup" | "confirm";
 
@@ -80,14 +81,13 @@ function RainPanel({ tagline }: { tagline: string }) {
 export function AuthModal({
   open,
   onClose,
-  lang,
   onAuthed,
 }: {
   open: boolean;
   onClose: () => void;
-  lang: Lang;
   onAuthed: () => void;
 }) {
+  const lang = useLang();
   const t = authCopy[lang];
   const reduce = useReducedMotion();
   const [mode, setMode] = useState<Mode>("signin");
@@ -128,7 +128,7 @@ export function AuthModal({
         await signUp({
           username: form.email,
           password: form.password,
-          options: { userAttributes: { email: form.email, given_name: form.firstName, family_name: form.lastName } },
+          options: { userAttributes: { email: form.email, given_name: form.firstName, family_name: form.lastName, locale: lang } },
         });
         setMode("confirm");
       } else {

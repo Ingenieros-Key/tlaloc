@@ -12,4 +12,5 @@ export type DataConfig = {
   readonly userPoolClientName: string;
   readonly sesDomain: string;
   readonly sesSender: string;
+  readonly assetBaseUrl: string;
 };

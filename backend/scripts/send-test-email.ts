@@ -23,6 +23,7 @@ function arg(name: string): string | undefined {
 
 const to = arg('to');
 const template = (arg('template') ?? 'welcome') as 'confirm' | 'reset' | 'welcome';
+const lang = (arg('lang') ?? 'en') === 'es' ? 'es' : 'en';
 const from = arg('from') ?? 'info@tlaloc.space';
 const region = process.env.REGION ?? 'us-east-1';
 
@@ -33,10 +34,10 @@ if (!to) {
 
 const rendered =
   template === 'confirm'
-    ? confirmationEmail('123456')
+    ? confirmationEmail('123456', lang)
     : template === 'reset'
-      ? passwordResetEmail('123456')
-      : welcomeEmail(to);
+      ? passwordResetEmail('123456', lang)
+      : welcomeEmail(to, lang);
 
 const ses = new SESv2Client({ region });
 
