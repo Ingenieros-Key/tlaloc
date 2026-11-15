@@ -132,6 +132,8 @@ export function AuthModal({
     }
   }
 
+  const pwMismatch = mode === "signup" && form.confirm.length > 0 && form.password !== form.confirm;
+
   const field =
     "w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[#1FC8B4] focus:ring-2 focus:ring-[#1FC8B4]/40";
 
@@ -246,20 +248,24 @@ export function AuthModal({
                 )}
 
                 {mode === "signup" && (
-                  <div className="relative">
-                    <input
-                      className={`${field} pr-11`}
-                      type={showConfirm ? "text" : "password"}
-                      placeholder={t.confirmPassword}
-                      autoComplete="new-password"
-                      required
-                      minLength={8}
-                      value={form.confirm}
-                      onChange={set("confirm")}
-                    />
-                    <button type="button" onClick={() => setShowConfirm((s) => !s)} aria-label={showConfirm ? t.hidePassword : t.showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-400 hover:text-gray-700">
-                      <EyeIcon open={showConfirm} />
-                    </button>
+                  <div>
+                    <div className="relative">
+                      <input
+                        className={`${field} pr-11 ${pwMismatch ? "border-red-400 focus:border-red-400 focus:ring-red-400/40" : ""}`}
+                        type={showConfirm ? "text" : "password"}
+                        placeholder={t.confirmPassword}
+                        autoComplete="new-password"
+                        required
+                        minLength={8}
+                        aria-invalid={pwMismatch}
+                        value={form.confirm}
+                        onChange={set("confirm")}
+                      />
+                      <button type="button" onClick={() => setShowConfirm((s) => !s)} aria-label={showConfirm ? t.hidePassword : t.showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-400 hover:text-gray-700">
+                        <EyeIcon open={showConfirm} />
+                      </button>
+                    </div>
+                    {pwMismatch && <p className="mt-1.5 text-xs text-red-600">{t.mismatch}</p>}
                   </div>
                 )}
 
@@ -271,7 +277,7 @@ export function AuthModal({
 
                 <motion.button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || pwMismatch}
                   whileTap={reduce ? undefined : { scale: 0.98 }}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0B1033] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#122152] disabled:opacity-60"
                 >
