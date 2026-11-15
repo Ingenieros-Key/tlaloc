@@ -5,9 +5,8 @@ import { cn } from "@/lib/utils";
 
 export function Brand({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2.5", className)} aria-label="Tlaloc">
-      <img src="/tlaloc-mascot.png" alt="" aria-hidden className="h-9 w-9" />
-      <span className="font-display text-lg font-bold tracking-wide text-text">Tlaloc</span>
+    <Link href="/" className={cn("flex items-center", className)} aria-label="Tlaloc">
+      <img src="/tlaloc-mascot.png" alt="Tlaloc" className="h-11 w-11" />
     </Link>
   );
 }

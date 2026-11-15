@@ -4,7 +4,6 @@ import Link from "next/link";
 import { SiteNav } from "@/components/ui/site-nav";
 import { landingCopy } from "@/components/ui/i18n";
 import { useLang } from "@/lib/i18n-store";
-import { useAuthProfile } from "@/lib/auth";
 
 const css = `
 .tl-root {
@@ -19,48 +18,38 @@ const css = `
   flex-direction: column;
   --hueso: #f4f0e6;
   --jade: #1fc8b4;
-  --maiz: #f6b93b;
   --piedra: #9aa3c7;
   --obsidiana: #060818;
 }
 .tl-main {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 2rem 1.5rem 3rem; gap: 1.5rem;
-}
-.tl-mark { width: min(200px, 50vw); height: auto; }
-.tl-hero-gif { width: min(360px, 82vw); height: auto; border-radius: 16px; display: block; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
-.tl-wordmark {
-  font-family: var(--font-chakra), sans-serif; font-weight: 700;
-  font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1; letter-spacing: 0.02em;
-  color: var(--hueso); margin-top: -0.25rem;
+  text-align: center; padding: 2.5rem 1.5rem 4rem; gap: 1.5rem;
 }
 .tl-tag {
   font-family: var(--font-plex-mono), monospace; color: var(--jade);
   font-size: 0.8rem; letter-spacing: 0.22em; text-transform: uppercase;
 }
-.tl-h1 { font-family: var(--font-chakra), sans-serif; font-weight: 700; font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1.05; }
-.tl-lead { max-width: 40ch; color: var(--piedra); font-size: clamp(1rem, 2.5vw, 1.15rem); line-height: 1.6; }
-.tl-dot {
-  display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 999px;
-  background: var(--maiz); box-shadow: 0 0 0 0 rgba(246,185,59,0.6); animation: tl-pulse 2s infinite;
+.tl-h1 {
+  font-family: var(--font-chakra), sans-serif; font-weight: 700;
+  font-size: clamp(1.9rem, 4.5vw, 3.2rem); line-height: 1.08; max-width: 20ch;
 }
-@keyframes tl-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(246,185,59,0.5); }
-  70% { box-shadow: 0 0 0 10px rgba(246,185,59,0); }
-  100% { box-shadow: 0 0 0 0 rgba(246,185,59,0); }
+.tl-lead {
+  font-family: var(--font-plex-sans), sans-serif;
+  max-width: 60ch; color: var(--piedra); font-size: clamp(1rem, 2.2vw, 1.15rem); line-height: 1.7;
 }
-.tl-status {
-  display: inline-flex; align-items: center; gap: 0.6rem;
-  font-family: var(--font-plex-mono), monospace; font-size: 0.85rem; color: var(--hueso);
+.tl-video {
+  width: min(760px, 92vw); height: auto; margin-top: 0.75rem;
+  border-radius: 16px; border: 1px solid rgba(154,163,199,0.25);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45); background: #000;
 }
 .tl-cta {
-  display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;
-  border: 1px solid var(--jade); background: transparent; color: var(--jade);
-  border-radius: 999px; padding: 0.6rem 1.4rem; cursor: pointer; text-decoration: none;
-  font-family: var(--font-plex-mono), monospace; font-size: 0.85rem; font-weight: 500;
-  letter-spacing: 0.04em; transition: background 0.15s, color 0.15s;
+  display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;
+  border: 1px solid var(--jade); background: var(--jade); color: var(--obsidiana);
+  border-radius: 999px; padding: 0.7rem 1.6rem; cursor: pointer; text-decoration: none;
+  font-family: var(--font-plex-mono), monospace; font-size: 0.9rem; font-weight: 500;
+  letter-spacing: 0.04em; transition: opacity 0.15s;
 }
-.tl-cta:hover { background: var(--jade); color: var(--obsidiana); }
+.tl-cta:hover { opacity: 0.9; }
 .tl-footer {
   text-align: center; padding: 1.5rem; color: rgba(154,163,199,0.6);
   font-size: 0.75rem; font-family: var(--font-plex-mono), monospace;
@@ -74,17 +63,14 @@ html.tl-light-theme .tl-root {
     radial-gradient(900px 500px at 85% 110%, rgba(246,185,59,0.22), transparent 60%),
     #f4f0e6;
 }
-html.tl-light-theme .tl-wordmark, html.tl-light-theme .tl-h1, html.tl-light-theme .tl-status { color: #0b1033; }
+html.tl-light-theme .tl-h1 { color: #0b1033; }
 html.tl-light-theme .tl-tag { color: #0a7268; }
 html.tl-light-theme .tl-lead { color: #5b6178; }
 html.tl-light-theme .tl-footer { color: rgba(11,16,51,0.55); }
-@media (prefers-reduced-motion: reduce) { .tl-dot { animation: none; } }
 `;
 
 export default function Home() {
   const t = landingCopy[useLang()];
-  const { status } = useAuthProfile();
-  const signedIn = status === "in";
 
   return (
     <div className="tl-root">
@@ -92,21 +78,10 @@ export default function Home() {
       <SiteNav />
 
       <main className="tl-main">
-        {signedIn ? (
-          <img className="tl-hero-gif" src="/tlaloc-crop-cycle-loop.gif" alt="Ciclo de cultivo de Tlaloc · Tlaloc crop cycle" />
-        ) : (
-          <>
-            <img className="tl-mark" src="/tlaloc-mascot.png" alt="Tlaloc" />
-            <p className="tl-wordmark">Tlaloc</p>
-          </>
-        )}
         <span className="tl-tag">{t.tag}</span>
-        <h1 className="tl-h1">{t.heading}</h1>
-        <p className="tl-lead">{t.lead}</p>
-        <span className="tl-status">
-          <span className="tl-dot" aria-hidden />
-          <span>{t.building}</span>
-        </span>
+        <h1 className="tl-h1">{t.headline}</h1>
+        <p className="tl-lead">{t.description}</p>
+        <video className="tl-video" src="/tlaloc-intro.mp4" controls playsInline preload="metadata" />
         <Link className="tl-cta" href="/workspace">
           {t.workspace}
           <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
