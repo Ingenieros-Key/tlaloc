@@ -19,6 +19,9 @@ import { t } from "./strings";
 import type {
   AnalysisState,
   Basemap,
+  DisplayKey,
+  DisplaySettings,
+  InspectorView,
   LayerId,
   LayerSettings,
   MapController,
@@ -45,6 +48,12 @@ export type WorkspaceState = {
   readonly view: ViewState;
   /** Drawer open state, only meaningful below the lg breakpoint. */
   readonly panels: Readonly<Record<PanelId, boolean>>;
+  /** Point the user jumped to with "Go to coordinates", shown as a pin. [lng, lat] */
+  readonly pin: readonly [number, number] | null;
+  /** "Pick on map" mode: the next map click places the pin. */
+  readonly picking: boolean;
+  readonly inspectorView: InspectorView;
+  readonly display: DisplaySettings;
   /** Floating panel collapsed to its header, only meaningful at lg and up. */
   readonly collapsed: Readonly<Record<PanelId, boolean>>;
 };
@@ -63,7 +72,25 @@ export type WorkspaceAction =
   | { readonly type: "analysisFinished"; readonly analysis: AnalysisState }
   | { readonly type: "setView"; readonly view: ViewState }
   | { readonly type: "setPanel"; readonly panel: PanelId; readonly open: boolean }
-  | { readonly type: "setCollapsed"; readonly panel: PanelId; readonly collapsed: boolean };
+  | { readonly type: "setCollapsed"; readonly panel: PanelId; readonly collapsed: boolean }
+  | { readonly type: "setPin"; readonly pin: readonly [number, number] | null }
+  | { readonly type: "setPicking"; readonly picking: boolean }
+  | { readonly type: "setInspectorView"; readonly view: InspectorView }
+  | { readonly type: "setDisplay"; readonly key: DisplayKey; readonly visible: boolean }
+  | { readonly type: "resetDisplay" };
+
+/** Everything visible: the workspace as first designed. */
+export const DEFAULT_DISPLAY: DisplaySettings = {
+  data: true,
+  borders: true,
+  outline: true,
+  labels: true,
+  tooltips: true,
+  pin: true,
+  navBar: true,
+  legends: true,
+  limiting: true,
+};
 
 export const INITIAL_STATE: WorkspaceState = {
   tool: "pan",
@@ -81,12 +108,17 @@ export const INITIAL_STATE: WorkspaceState = {
   view: { bearing: 0, pitch: 30, zoom: 8 },
   panels: { browser: false, inspector: false },
   collapsed: { browser: false, inspector: false },
+  pin: null,
+  picking: false,
+  inspectorView: "results",
+  display: DEFAULT_DISPLAY,
 };
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case "setTool":
-      return { ...state, tool: action.tool };
+      // Choosing a drawing tool takes the map click away from "Pick on map".
+      return { ...state, tool: action.tool, picking: action.tool === "pan" && state.picking };
     case "setBasemap":
       return { ...state, basemap: action.basemap };
     case "set3d":
@@ -120,8 +152,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         plot: action.plot,
         plotSummary: summarizePlot(action.plot),
         analysis: { status: "running" },
-        // A new plot produces results, so bring the Inspector back if it was collapsed.
+        // A new plot produces results, so bring them into view.
         collapsed: { ...state.collapsed, inspector: false },
+        inspectorView: "results",
       };
     case "clearPlot":
       return {
@@ -143,6 +176,22 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return { ...state, panels: { ...state.panels, [action.panel]: action.open } };
     case "setCollapsed":
       return { ...state, collapsed: { ...state.collapsed, [action.panel]: action.collapsed } };
+    case "setPin":
+      return { ...state, pin: action.pin };
+    case "setInspectorView":
+      // Switching what the card shows also unfolds it if it was collapsed.
+      return {
+        ...state,
+        inspectorView: action.view,
+        collapsed: { ...state.collapsed, inspector: false },
+      };
+    case "setDisplay":
+      return { ...state, display: { ...state.display, [action.key]: action.visible } };
+    case "resetDisplay":
+      return { ...state, display: DEFAULT_DISPLAY };
+    case "setPicking":
+      // Picking needs plain map clicks, so it parks any drawing tool on Pan.
+      return action.picking ? { ...state, picking: true, tool: "pan" } : { ...state, picking: false };
   }
 }
 

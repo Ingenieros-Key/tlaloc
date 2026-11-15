@@ -34,6 +34,23 @@ export type GridCell = {
 
 export type Tool = "pan" | "square" | "edit";
 
+/** Things the Display card can show or hide. Order here is display order within each section. */
+export type DisplayKey =
+  | "data"
+  | "borders"
+  | "outline"
+  | "labels"
+  | "tooltips"
+  | "pin"
+  | "navBar"
+  | "legends"
+  | "limiting";
+
+export type DisplaySettings = Readonly<Record<DisplayKey, boolean>>;
+
+/** What the right-hand card shows: the plot's results, or the Display switches. */
+export type InspectorView = "results" | "display";
+
 export type Basemap = "map" | "satellite";
 
 export type PlotFeature = Feature<Polygon>;
@@ -93,4 +110,6 @@ export type MapController = {
   readonly resetView: () => void;
   /** Fit the camera to the current plot, if any. */
   readonly focusPlot: () => void;
+  /** Fly to a point ([lng, lat]), zooming in to at least street-level detail. */
+  readonly goTo: (lngLat: readonly [number, number]) => void;
 };

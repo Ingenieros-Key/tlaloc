@@ -17,7 +17,6 @@ export function BrowserPanel() {
       title={t.browser.title}
       labelledBy="browser-title"
       collapse={collapse}
-      className="h-full"
     >
       <PlotsGroup />
       <PanelGroup label={t.browser.layers} count={LAYER_ORDER.length}>

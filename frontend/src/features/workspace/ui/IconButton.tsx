@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 
 type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   readonly icon: LucideIcon;
@@ -10,6 +10,7 @@ type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
   /** Toggle buttons pass `pressed`; renders aria-pressed and the active style. */
   readonly pressed?: boolean;
   readonly size?: "sm" | "md";
+  readonly ref?: Ref<HTMLButtonElement>;
 };
 
 /**

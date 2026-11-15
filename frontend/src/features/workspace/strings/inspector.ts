@@ -1,3 +1,5 @@
+import type { DisplayKey } from "../types";
+
 /** UI strings for the inspector area. Owned by the inspector module; add keys freely. */
 export const inspector = {
   title: "Inspector",
@@ -44,5 +46,36 @@ export const inspector = {
   announceDone: (crops: readonly string[], rating: string, score: number) =>
     `Analysis complete. ${crops.length > 1 ? "Best matches" : "Best match"}: ${new Intl.ListFormat("en-US").format(crops)}, ${rating}, ${score} of 100.`,
   announceOutside: "Analysis complete. This plot is outside the sample coverage.",
-  sampleFooter: "Sample data — simulated values, not real NASA observations.",
+  display: {
+    title: "Display",
+    reset: "Show all",
+    resetHint: "Turn every item back on",
+    sections: {
+      map: "Map",
+      overlays: "Overlays",
+      panels: "Panels",
+    },
+    items: {
+      data: "Data layer",
+      borders: "Cell borders",
+      outline: "Country outline",
+      labels: "Place labels",
+      tooltips: "Cell tooltips",
+      pin: "Go to pin",
+      navBar: "Navigation bar",
+      legends: "Legends",
+      limiting: "Limiting factors",
+    } satisfies Record<DisplayKey, string>,
+    descriptions: {
+      data: "Hexagons of the active layer",
+      borders: "Hairlines between hexagons",
+      outline: "El Salvador border",
+      labels: "Basemap towns, roads and places",
+      tooltips: "Values when hovering a hexagon",
+      pin: "Marker placed with Go to",
+      navBar: "Zoom, compass and Go to at the bottom",
+      legends: "Color scales in the Browser",
+      limiting: "What holds each crop back",
+    } satisfies Record<DisplayKey, string>,
+  },
 } as const;

@@ -64,6 +64,18 @@ export function needsStyleSwap(
 }
 
 /**
+ * Shows or hides the basemap's text and icon (symbol) layers: towns, roads, places. Terra-draw's
+ * own layers are left alone. Style swaps reset this, so callers reapply it on `style.load`.
+ */
+export function setBasemapLabels(map: MapLibreMap, visible: boolean): void {
+  const visibility = visible ? "visible" : "none";
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== "symbol" || layer.id.startsWith(`${TD_PREFIX}-`)) continue;
+    map.setLayoutProperty(layer.id, "visibility", visibility);
+  }
+}
+
+/**
  * Layer id the deck.gl data layers render beneath: the first label (symbol) layer of the style, or
  * terra-draw's lowest layer, whichever comes first. Keeps data under basemap labels and under the
  * drawn plot. Call after terra-draw has registered its layers.

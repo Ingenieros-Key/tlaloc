@@ -1,7 +1,7 @@
 import type { Layer } from "@deck.gl/core";
 import { PathLayer, PolygonLayer, type PathLayerProps, type PolygonLayerProps } from "@deck.gl/layers";
 import { LAYERS, MUTED_CELL, rampColor } from "../layers";
-import type { GridCell, LayerId, LayerSettings, Rgba } from "../types";
+import type { DisplaySettings, GridCell, LayerId, LayerSettings, Rgba } from "../types";
 import { COUNTRY_RINGS } from "./geo";
 import { CELL_HIGHLIGHT, CELL_STROKE, OUTLINE_COLOR } from "./theme";
 
@@ -24,6 +24,8 @@ type DeckLayerInput = {
   readonly layerSettings: Readonly<Record<LayerId, LayerSettings>>;
   /** MapLibre layer the deck layers are inserted beneath (undefined = top of the style). */
   readonly beforeId: string | undefined;
+  /** Display card switches that affect the deck layers. */
+  readonly display: Pick<DisplaySettings, "data" | "borders" | "outline">;
 };
 
 /**
@@ -52,10 +54,16 @@ function fillColor(id: LayerId, settings: LayerSettings): (cell: GridCell) => Rg
 }
 
 /** Builds the interleaved deck.gl layers: active sample-data hexagons, then the country outline. */
-export function buildDeckLayers({ cells, activeLayer, layerSettings, beforeId }: DeckLayerInput): Layer[] {
+export function buildDeckLayers({
+  cells,
+  activeLayer,
+  layerSettings,
+  beforeId,
+  display,
+}: DeckLayerInput): Layer[] {
   const layers: Layer[] = [];
 
-  if (activeLayer) {
+  if (activeLayer && display.data) {
     const settings = layerSettings[activeLayer];
     const dataProps: PolygonLayerProps<GridCell> & Interleaved = {
       id: DATA_LAYER_ID,
@@ -63,7 +71,7 @@ export function buildDeckLayers({ cells, activeLayer, layerSettings, beforeId }:
       data: cells,
       getPolygon: (cell) => cell.polygon,
       filled: true,
-      stroked: true,
+      stroked: display.borders,
       extruded: false,
       getFillColor: fillColor(activeLayer, settings),
       getLineColor: withOpacity(CELL_STROKE, settings.opacity),
@@ -80,6 +88,8 @@ export function buildDeckLayers({ cells, activeLayer, layerSettings, beforeId }:
     };
     layers.push(new PolygonLayer<GridCell>(dataProps));
   }
+
+  if (!display.outline) return layers;
 
   const outlineProps: PathLayerProps<LngLat[]> & Interleaved = {
     id: OUTLINE_LAYER_ID,
