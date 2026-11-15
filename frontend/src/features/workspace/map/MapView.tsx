@@ -13,12 +13,14 @@ import {
   type MapMouseEvent,
 } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { TerraDraw } from "terra-draw";
 import type { Theme } from "@/lib/theme";
 import { useAppTheme } from "../hooks/useAppTheme";
 import { formatDay } from "../panels/format";
 import { LAYERS, formatValue } from "../layers";
 import {
+  inspectorVisible,
   precipDayIndex,
   stepMs,
   useMapController,
@@ -37,6 +39,7 @@ import {
   setBasemapLabels,
 } from "./basemaps";
 import { DATA_LAYER_ID, buildDeckLayers, deckGroupId } from "./deckLayers";
+import { PlotMapLabel, type PlotBestCrop, type PlotReading } from "./PlotMapLabel";
 import { MAP_CONTAINER_ID } from "./focus";
 import {
   COUNTRY_BOUNDS,
@@ -126,6 +129,7 @@ function deckLayersFor(
     zoom: s.view.zoom,
     // Satellite imagery is dark whatever the app theme.
     theme: s.basemap === "satellite" ? "dark" : theme,
+    focusRing: s.focus && s.plot ? (s.plot.geometry.coordinates[0] as [number, number][]) : null,
     beforeId,
     display: s.display,
   });
@@ -194,6 +198,8 @@ export function MapView() {
   const styleLoadedRef = useRef(false);
   const fallbackRef = useRef(false);
   const markerRef = useRef<Marker | null>(null);
+  /** The plot's name, shown as a label at its centre (a DOM marker, so it survives style swaps). */
+  const plotLabelRef = useRef<Marker | null>(null);
   /**
    * True during a globe flight (the opening intro or a "Go to" jump): the map uses the globe
    * projection and deck layers stay hidden until it lands.
@@ -230,7 +236,7 @@ export function MapView() {
       ? { center: INTRO_CENTER, zoom: INTRO_ZOOM, pitch: 0 }
       : {
           bounds: COUNTRY_BOUNDS,
-          fitBoundsOptions: { padding: cameraPadding(container) },
+          fitBoundsOptions: { padding: cameraPadding(container, inspectorVisible(stateRef.current)) },
           pitch: initial.is3d ? PITCH_3D : 0,
         };
 
@@ -241,6 +247,8 @@ export function MapView() {
         style: basemapStyle(initial.basemap, themeRef.current),
         ...camera,
         maxPitch: initial.is3d ? MAX_PITCH : 0,
+        // Shift + drag rotates instead (see onRotateDown); box zoom would otherwise claim it.
+        boxZoom: false,
         attributionControl: false,
         locale: { "Map.Title": t.map.canvasLabel },
       });
@@ -307,7 +315,11 @@ export function MapView() {
     const onHover = (info: PickingInfo) => {
       const field = fieldRef.current;
       let index: number | null = null;
-      if (info.layer?.id === DATA_LAYER_ID && info.index >= 0) index = info.index;
+      if (info.layer?.id === DATA_LAYER_ID && info.index >= 0) {
+        // In focus the drawn pieces carry the index of the cell they were cut from.
+        const piece = info.object as { index?: number } | undefined;
+        index = typeof piece?.index === "number" ? piece.index : info.index;
+      }
       // The heatmap is not pickable, so look up the cell under the pointer instead.
       else if (field && info.coordinate && stateRef.current.dataStyle === "heatmap") {
         index = nearestCell(field, info.coordinate);
@@ -392,7 +404,7 @@ export function MapView() {
 
     const fitCountry = (duration: number) => {
       map.fitBounds(COUNTRY_BOUNDS, {
-        padding: cameraPadding(container),
+        padding: cameraPadding(container, inspectorVisible(stateRef.current)),
         bearing: 0,
         pitch: stateRef.current.is3d ? PITCH_3D : 0,
         duration,
@@ -401,8 +413,12 @@ export function MapView() {
 
     const fitPlot = (bounds: ReturnType<typeof plotBounds>) => {
       map.fitBounds(bounds, {
-        padding: cameraPadding(container),
+        // A plot always brings up the Inspector with its results, even if this runs a moment before
+        // it renders, so leave room for it.
+        padding: cameraPadding(container, true),
         maxZoom: PLOT_MAX_ZOOM,
+        // Keep the user's rotation: fitBounds would otherwise snap back to north.
+        bearing: map.getBearing(),
         duration: motionMs(600),
       });
     };
@@ -427,7 +443,7 @@ export function MapView() {
           zoom: Math.max(map.getZoom(), GOTO_MIN_ZOOM),
           bearing: 0,
           pitch: stateRef.current.is3d ? PITCH_3D : 0,
-          padding: cameraPadding(container),
+          padding: cameraPadding(container, inspectorVisible(stateRef.current)),
         };
         if (motionMs(1) === 0) {
           map.jumpTo(target);
@@ -463,7 +479,7 @@ export function MapView() {
       const origin = map.project(center);
       const viewSide = center.distanceTo(map.unproject([origin.x + sidePx, origin.y]));
       const side = Math.min(KEYBOARD_PLOT_MAX_M, Math.max(KEYBOARD_PLOT_MIN_M, viewSide));
-      const next = squareAround([center.lng, center.lat], side);
+      const next = squareAround([center.lng, center.lat], side, map.getBearing());
       dispatch({ type: "setPlot", plot: next });
       dispatch({ type: "setTool", tool: "pan" });
       if (side !== viewSide) fitPlot(plotBounds(next));
@@ -521,12 +537,44 @@ export function MapView() {
       setNotice((current) => current ?? "slow");
     }, LOAD_TIMEOUT_MS);
 
+    // Shift + drag rotates the map (and tilts it, in 3D) while the Pan tool is active. MapLibre's own
+    // rotate gestures (right-drag, Ctrl + drag, Shift + arrow keys, two-finger twist) still work.
+    // Captured on the map's outer container so MapLibre's pan never sees the drag.
+    let rotateDrag: { x: number; y: number; bearing: number; pitch: number } | null = null;
+    const onRotateMove = (e: MouseEvent) => {
+      if (!rotateDrag) return;
+      map.jumpTo({
+        bearing: rotateDrag.bearing + (e.clientX - rotateDrag.x) * ROTATE_DEG_PER_PX,
+        pitch: rotateDrag.pitch - (e.clientY - rotateDrag.y) * TILT_DEG_PER_PX,
+      });
+    };
+    const endRotate = () => {
+      if (!rotateDrag) return;
+      rotateDrag = null;
+      map.getCanvas().style.cursor = "";
+      window.removeEventListener("mousemove", onRotateMove);
+      window.removeEventListener("mouseup", endRotate);
+    };
+    const onRotateDown = (e: MouseEvent) => {
+      const s = stateRef.current;
+      if (!e.shiftKey || e.button !== 0 || s.tool !== "pan" || s.picking || globeRef.current) return;
+      if (!(e.target instanceof Node) || !map.getCanvasContainer().contains(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      map.getCanvas().focus({ preventScroll: true });
+      rotateDrag = { x: e.clientX, y: e.clientY, bearing: map.getBearing(), pitch: map.getPitch() };
+      map.getCanvas().style.cursor = "grabbing";
+      window.addEventListener("mousemove", onRotateMove);
+      window.addEventListener("mouseup", endRotate);
+    };
+
     map.on("style.load", onStyleLoad);
     map.once("load", onLoad);
     map.on("idle", onIdle);
     map.on("move", onMove);
     map.on("error", onError);
     container.addEventListener("keydown", onKeyDown);
+    container.addEventListener("mousedown", onRotateDown, true);
 
     return () => {
       window.clearTimeout(loadTimer);
@@ -536,6 +584,8 @@ export function MapView() {
       if (moveFrame) cancelAnimationFrame(moveFrame);
       register(null);
       container.removeEventListener("keydown", onKeyDown);
+      container.removeEventListener("mousedown", onRotateDown, true);
+      endRotate();
       map.off("style.load", onStyleLoad);
       map.off("load", onLoad);
       map.off("idle", onIdle);
@@ -555,6 +605,8 @@ export function MapView() {
       }
       markerRef.current?.remove();
       markerRef.current = null;
+      plotLabelRef.current?.remove();
+      plotLabelRef.current = null;
       mapRef.current = null;
       map.remove();
     };
@@ -566,7 +618,7 @@ export function MapView() {
     overlayRef.current?.setProps({
       layers: deckLayersFor(stateRef.current, fieldRef.current, beforeId, globeActive, theme),
     });
-  }, [globeActive, activeLayer, layerSettings, dataStyle, heatmapZoom, beforeId, display, theme, basemap]);
+  }, [globeActive, activeLayer, layerSettings, dataStyle, heatmapZoom, beforeId, display, theme, basemap, state.focus, state.plot]);
 
   // The selected day's values. While the timeline plays, the map blends from what is on screen to
   // the new day over one step, so playback moves continuously instead of jumping day to day.
@@ -651,6 +703,87 @@ export function MapView() {
   }, [basemap, theme]);
 
   // "Go to" pin: a draggable DOM marker, so it survives basemap/theme style swaps untouched.
+  // Esc leaves focus (unless something else, like a drawer or a text field, already handled it).
+  const focus = state.focus;
+  useEffect(() => {
+    if (!focus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, select")) return;
+      dispatch({ type: "setFocus", focus: false });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus, dispatch]);
+
+  // Plot name label at the plot's centre. Follows the plot while it is edited, stays upright when
+  // the map rotates, and lets clicks through so it never blocks drawing or panning.
+  const plotCenter = state.plotSummary?.centroid ?? null;
+  const { plotName, analysis } = state;
+  const [labelElement] = useState(() => document.createElement("div"));
+  const showPlotLabel = loaded && plotCenter !== null && display.plotLabel;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !showPlotLabel || !plotCenter) {
+      plotLabelRef.current?.remove();
+      plotLabelRef.current = null;
+      return;
+    }
+    let label = plotLabelRef.current;
+    if (!label) {
+      label = new Marker({ element: labelElement, anchor: "center" });
+      label.setLngLat([plotCenter[0], plotCenter[1]]).addTo(map);
+      plotLabelRef.current = label;
+    }
+    label.setLngLat([plotCenter[0], plotCenter[1]]);
+  }, [plotCenter, showPlotLabel, labelElement]);
+
+  // Zoomed out far enough that the plot is only a few pixels across, the label turns into a
+  // compact crop marker. Re-measured as the camera moves (once per frame at most).
+  const [plotCompact, setPlotCompact] = useState(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || !plot) return;
+    const ring = plot.geometry.coordinates[0];
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const points = ring.map(([lng, lat]) => map.project([lng, lat]));
+      const xs = points.map((p) => p.x);
+      const ys = points.map((p) => p.y);
+      const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+      setPlotCompact(size < PLOT_COMPACT_PX);
+    };
+    const onMove = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    map.on("move", onMove);
+    return () => {
+      map.off("move", onMove);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [plot, loaded]);
+
+  const bestCrop = useMemo<PlotBestCrop | null>(() => {
+    if (analysis.status !== "done" || analysis.result.kind !== "ok") return null;
+    const top = analysis.result.crops.reduce((a, b) => (b.score > a.score ? b : a));
+    return { crop: top.crop, score: top.score, rating: top.rating };
+  }, [analysis]);
+
+  // Focus: the day's value under the plot (the cell its centre falls in), as drawn on the map.
+  const plotCellIndex = useMemo(() => {
+    if (!frames || !plotCenter) return null;
+    return nearestCell({ cells: frames.hexes, values: new Float32Array(0), version: 0 }, plotCenter);
+  }, [frames, plotCenter]);
+  const plotReading = useMemo<PlotReading | null>(() => {
+    if (!state.focus || !frames || !dayValues || plotCellIndex === null) return null;
+    const value = dayValues[plotCellIndex];
+    const day = frames.dates[dayIndex];
+    if (Number.isNaN(value) || !day) return null;
+    return { value: t.map.millimetres(value.toLocaleString("en-US", { maximumFractionDigits: 1 })), day: formatDay(day, true) };
+  }, [state.focus, frames, dayValues, plotCellIndex, dayIndex]);
+
   // Dragging it updates the pin (and so the Go to fields); the camera stays put.
   useEffect(() => {
     const map = mapRef.current;
@@ -740,12 +873,25 @@ export function MapView() {
         />
       ) : null}
       {dry && loaded && !globeActive && dayMax !== null ? <DryDayChip max={dayMax} /> : null}
+      {showPlotLabel
+        ? createPortal(
+            <PlotMapLabel name={plotName} best={bestCrop} reading={plotReading} compact={plotCompact} />,
+            labelElement,
+          )
+        : null}
       {spinning ? <LoadingIndicator label={t.map.loading} /> : null}
       {switching ? <LoadingIndicator label={t.map.switchingBasemap} compact /> : null}
       {notice ? <LoadNotice kind={notice} onDismiss={() => setNotice(null)} /> : null}
     </div>
   );
 }
+
+/** Below this size on screen (px, longest side) the plot label becomes a compact crop marker. */
+const PLOT_COMPACT_PX = 28;
+
+/** Shift + drag: degrees of rotation per pixel across, and of tilt per pixel up or down. */
+const ROTATE_DEG_PER_PX = 0.35;
+const TILT_DEG_PER_PX = 0.25;
 
 /** Below this, nowhere in the country had measurable rain: the usual "rain day" cut-off. */
 const DRY_DAY_MM = 1;

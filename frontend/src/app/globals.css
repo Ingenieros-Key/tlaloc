@@ -1,28 +1,33 @@
 @import "tailwindcss";
 
 /*
- * Tlaloc design tokens. Dark-only for v1; every component consumes these via
- * Tailwind utilities (bg-surface, text-muted, border-line, ...). Never use raw hex in components.
+ * Tlaloc design tokens: dark theme here (default), light theme below. Every component consumes
+ * these via Tailwind utilities (bg-surface, text-muted, border-line, ...). Never use raw hex in
+ * components.
+ *
+ * Dark surfaces use NASA blue's hue (#0B3D91, ~261° OKLCH) at low chroma (0.04–0.06), so panels
+ * read as blue without glowing and sit calmly on the grey dark basemap.
  */
 :root {
-  --tl-bg: #060818;
-  --tl-surface: #0b1033;
-  --tl-surface-2: #121845;
-  --tl-surface-3: #1a2158;
-  --tl-line: #262e66;
-  --tl-line-strong: #36408a;
+  --tl-bg: #050b16;
+  --tl-surface: #0a1528;
+  --tl-surface-2: #0f1e38;
+  --tl-surface-3: #162847;
+  --tl-line: #22375a;
+  --tl-line-strong: #304b78;
   --tl-text: #f4f0e6;
-  --tl-muted: #9aa3c7;
+  --tl-muted: #9eb0cc;
   --tl-accent: #1fc8b4;
   --tl-accent-strong: #0a7268;
-  --tl-on-accent: #060818;
-  --tl-indigo: #2b3a9e;
+  --tl-on-accent: #050b16;
+  /* NASA blue, for brand moments; not a surface color. */
+  --tl-indigo: #0b3d91;
   --tl-good: #5dbb63;
   --tl-fair: #f6b93b;
   --tl-poor: #f2724f;
   /* Outline of form fields and chips: 3:1 against the surface (WCAG 1.4.11). */
-  --tl-input: #5f6aa8;
-  --tl-overlay: rgb(6 8 24 / 0.72);
+  --tl-input: #5b78aa;
+  --tl-overlay: rgb(5 11 22 / 0.72);
 
   --tl-topbar-h: 52px;
   --tl-ribbon-h: 72px;
@@ -142,5 +147,12 @@ body {
   .maplibregl-map .maplibregl-ctrl-top-right {
     right: calc(var(--tl-inspector-w) + 24px);
     max-width: calc(100% - var(--tl-browser-w) - var(--tl-inspector-w) - 48px);
+  }
+}
+/* No Inspector on screen (no plot, Display closed): the attribution moves to the map's edge. */
+@media (min-width: 1024px) {
+  #workspace-canvas[data-inspector="hidden"] .maplibregl-map .maplibregl-ctrl-top-right {
+    right: 12px;
+    max-width: calc(100% - var(--tl-browser-w) - 36px);
   }
 }

@@ -1,6 +1,13 @@
 import type { Layer } from "@deck.gl/core";
 import { HeatmapLayer, type HeatmapLayerProps } from "@deck.gl/aggregation-layers";
-import { PathLayer, PolygonLayer, type PathLayerProps, type PolygonLayerProps } from "@deck.gl/layers";
+import { bbox, featureCollection, intersect, polygon as turfPolygon } from "@turf/turf";
+import {
+  PathLayer,
+  PolygonLayer,
+  SolidPolygonLayer,
+  type PathLayerProps,
+  type PolygonLayerProps,
+} from "@deck.gl/layers";
 import { LAYERS, MUTED_CELL, rampColor } from "../layers";
 import type { DataField, DataStyle, DisplaySettings, FieldCell, LayerId, LayerSettings, Rgba } from "../types";
 import { COUNTRY_RINGS } from "./geo";
@@ -18,6 +25,54 @@ const COUNTRY_PATHS: readonly LngLat[][] = COUNTRY_RINGS.map((ring) =>
 
 const TRANSPARENT: Rgba = [0, 0, 0, 0];
 
+const DIM_LAYER_ID = "tl-focus-dim";
+/** Whole-world ring (Web Mercator limits) that the focus dim cuts the plot out of. */
+const WORLD_RING: LngLat[] = [
+  [-180, -85],
+  [180, -85],
+  [180, 85],
+  [-180, 85],
+  [-180, -85],
+];
+/** Focus dim over everything outside the plot: --tl-bg on dark maps, navy tint on light ones. */
+const DIM_DARK: Rgba = [5, 11, 22, 150];
+const DIM_LIGHT: Rgba = [11, 16, 51, 80];
+
+type RingFeature = { readonly polygon: readonly (readonly LngLat[])[] };
+
+/** A grid cell cut to the plot's outline; `index` points back into the field's values. */
+type ClippedCell = { readonly polygon: LngLat[][]; readonly index: number };
+
+let clipCache: { cells: readonly FieldCell[]; key: string; result: ClippedCell[] } | null = null;
+
+/**
+ * The cells under the plot, each cut to the plot's outline. A plot is usually far smaller than a
+ * cell (3.5 km hexagons, ~55 km NASA grid), so this is typically one piece of one hexagon. Cut on
+ * the CPU: deck.gl's GPU mask does not run in interleaved MapLibre mode. Cached per plot and grid.
+ */
+function clipCellsToRing(cells: readonly FieldCell[], ring: readonly LngLat[]): ClippedCell[] {
+  const key = JSON.stringify(ring);
+  if (clipCache && clipCache.cells === cells && clipCache.key === key) return clipCache.result;
+  const plot = turfPolygon([ring.map(([lng, lat]) => [lng, lat])]);
+  const [minX, minY, maxX, maxY] = bbox(plot);
+  const result: ClippedCell[] = [];
+  cells.forEach((cell, index) => {
+    const xs = cell.polygon.map(([x]) => x);
+    const ys = cell.polygon.map(([, y]) => y);
+    if (Math.max(...xs) < minX || Math.min(...xs) > maxX || Math.max(...ys) < minY || Math.min(...ys) > maxY) {
+      return;
+    }
+    const piece = intersect(featureCollection([turfPolygon([cell.polygon.map(([x, y]) => [x, y])]), plot]));
+    if (!piece) return;
+    const polygons = piece.geometry.type === "Polygon" ? [piece.geometry.coordinates] : piece.geometry.coordinates;
+    for (const rings of polygons) {
+      result.push({ polygon: rings.map((r) => r.map(([x, y]): LngLat => [x, y])), index });
+    }
+  });
+  clipCache = { cells, key, result };
+  return result;
+}
+
 /** `beforeId` is read by @deck.gl/maplibre in interleaved mode but is not part of core LayerProps. */
 type Interleaved = { readonly beforeId?: string };
 
@@ -31,6 +86,8 @@ type DeckLayerInput = {
   readonly zoom: number;
   /** Basemap brightness, so the hexagon hairlines stay visible on the dark map. */
   readonly theme: "light" | "dark";
+  /** Focus plot: the plot's ring. Data is clipped to it and everything outside is dimmed. */
+  readonly focusRing: readonly LngLat[] | null;
   /** MapLibre layer the deck layers are inserted beneath (undefined = top of the style). */
   readonly beforeId: string | undefined;
   /** Display card switches that affect the deck layers. */
@@ -49,13 +106,19 @@ function withOpacity([r, g, b, a]: Rgba, opacity: number): Rgba {
   return [r, g, b, Math.round(a * opacity)];
 }
 
-function fillColor(id: LayerId, settings: LayerSettings, values: Float32Array) {
+/** Fill for a cell from its value. `valueIndex` maps a drawn object to its slot in `values`. */
+function fillColor<T>(
+  id: LayerId,
+  settings: LayerSettings,
+  values: Float32Array,
+  valueIndex: (object: T, index: number) => number,
+) {
   const def = LAYERS[id];
   const alpha = Math.round(255 * settings.opacity);
   const muted = withOpacity(MUTED_CELL, settings.opacity);
   const [lo, hi] = settings.range;
-  return (_cell: FieldCell, { index }: { index: number }): Rgba => {
-    const value = values[index];
+  return (object: T, { index }: { index: number }): Rgba => {
+    const value = values[valueIndex(object, index)];
     if (Number.isNaN(value)) return TRANSPARENT;
     if (value < lo || value > hi) return muted;
     const [r, g, b, a] = rampColor(def, value);
@@ -91,16 +154,53 @@ export function buildDeckLayers({
   style,
   zoom,
   theme,
+  focusRing,
   beforeId,
   display,
 }: DeckLayerInput): Layer[] {
   const layers: Layer[] = [];
 
+  if (focusRing) {
+    layers.push(
+      new SolidPolygonLayer<RingFeature>({
+        id: DIM_LAYER_ID,
+        beforeId,
+        data: [{ polygon: [WORLD_RING, focusRing.map(([lng, lat]): LngLat => [lng, lat])] }],
+        getPolygon: (f) => f.polygon.map((ring) => ring.map(([lng, lat]): LngLat => [lng, lat])),
+        getFillColor: theme === "dark" ? DIM_DARK : DIM_LIGHT,
+        pickable: false,
+        updateTriggers: { getFillColor: [theme], getPolygon: [focusRing] },
+      } as ConstructorParameters<typeof SolidPolygonLayer<RingFeature>>[0] & Interleaved),
+    );
+  }
+
   if (activeLayer && field && display.data) {
     const settings = layerSettings[activeLayer];
     const { cells, values, version } = field;
 
-    if (style === "heatmap") {
+    if (focusRing) {
+      // Focus: only the data under the plot, cut to its outline, in either style (inside a plot
+      // the heatmap would be flat anyway).
+      const focusProps: PolygonLayerProps<ClippedCell> & Interleaved = {
+        id: DATA_LAYER_ID,
+        beforeId,
+        data: clipCellsToRing(cells, focusRing),
+        getPolygon: (cell) => cell.polygon,
+        filled: true,
+        stroked: display.borders,
+        getFillColor: fillColor<ClippedCell>(activeLayer, settings, values, (cell) => cell.index),
+        getLineColor: withOpacity(theme === "dark" ? CELL_STROKE_DARK : CELL_STROKE, settings.opacity),
+        lineWidthUnits: "pixels",
+        getLineWidth: 0.5,
+        lineWidthMinPixels: 0.5,
+        pickable: true,
+        updateTriggers: {
+          getFillColor: [activeLayer, version, settings.opacity, settings.range[0], settings.range[1]],
+          getLineColor: [settings.opacity, theme],
+        },
+      };
+      layers.push(new PolygonLayer<ClippedCell>(focusProps));
+    } else if (style === "heatmap") {
       const def = LAYERS[activeLayer];
       // MEAN: each pixel shows the kernel-weighted average rainfall, in the layer's own units.
       // Typed as a plain object: deck.gl 9.4's HeatmapLayerProps don't line up with its constructor
@@ -138,7 +238,7 @@ export function buildDeckLayers({
         filled: true,
         stroked: display.borders,
         extruded: false,
-        getFillColor: fillColor(activeLayer, settings, values),
+        getFillColor: fillColor<FieldCell>(activeLayer, settings, values, (_cell, index) => index),
         getLineColor: withOpacity(theme === "dark" ? CELL_STROKE_DARK : CELL_STROKE, settings.opacity),
         lineWidthUnits: "pixels",
         getLineWidth: 0.5,

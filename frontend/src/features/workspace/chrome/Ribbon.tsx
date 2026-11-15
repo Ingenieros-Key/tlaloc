@@ -239,9 +239,17 @@ export function Ribbon() {
             id="focus"
             icon={Focus}
             label={s.focusPlot}
-            title={s.tooltip(s.focusPlotTip, undefined, hasPlot ? undefined : s.needsPlot)}
+            title={s.tooltip(state.focus ? s.exitFocusTip : s.focusPlotTip, undefined, hasPlot ? undefined : s.needsPlot)}
             disabled={!hasPlot}
-            onPress={() => controller.get()?.focusPlot()}
+            pressed={state.focus}
+            onPress={() => {
+              if (state.focus) {
+                dispatch({ type: "setFocus", focus: false });
+                return;
+              }
+              controller.get()?.focusPlot();
+              dispatch({ type: "setFocus", focus: true });
+            }}
           />
         </RibbonGroup>
         <GroupDivider />

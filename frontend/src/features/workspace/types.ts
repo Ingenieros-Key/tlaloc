@@ -69,6 +69,7 @@ export type DisplayKey =
   | "labels"
   | "tooltips"
   | "pin"
+  | "plotLabel"
   | "navBar"
   | "legends"
   | "limiting";
@@ -100,7 +101,11 @@ export type FactorScore = {
   readonly score: number;
   /** Where the value sits relative to the crop's ideal band. */
   readonly position: "below" | "within" | "above";
+  /** Where the value came from: NASA POWER, or the simulated sample grid. */
+  readonly source: FactorSource;
 };
+
+export type FactorSource = "nasa" | "sample";
 
 export type CropAssessment = {
   readonly crop: CropId;

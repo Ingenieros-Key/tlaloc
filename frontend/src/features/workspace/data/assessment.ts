@@ -2,6 +2,7 @@ import { bbox, booleanPointInPolygon, centroid } from "@turf/turf";
 import { LAYERS, SAMPLE_LAYER_ORDER } from "../layers";
 import type { Position } from "geojson";
 import type {
+  FactorSource,
   Assessment,
   CropAssessment,
   FactorScore,
@@ -42,7 +43,12 @@ function cellUnder([lng, lat]: Position, grid: readonly GridCell[]): readonly Gr
   return hit ? [hit] : [];
 }
 
-function scoreFactor(layer: SampleLayerId, value: number, crop: CropProfile): FactorScore {
+function scoreFactor(
+  layer: SampleLayerId,
+  value: number,
+  crop: CropProfile,
+  source: FactorSource,
+): FactorScore {
   const [lo, hi] = crop.ideal[layer];
   const [dMin, dMax] = LAYERS[layer].domain;
   const tolerance = (dMax - dMin) * FACTOR_TOLERANCE;
@@ -50,7 +56,7 @@ function scoreFactor(layer: SampleLayerId, value: number, crop: CropProfile): Fa
   const gap = position === "below" ? lo - value : position === "above" ? value - hi : 0;
   const score =
     position === "within" ? 100 : Math.min(99, Math.round(100 * Math.max(0, 1 - gap / tolerance)));
-  return { layer, value, score, position };
+  return { layer, value, score, position, source };
 }
 
 function rate(score: number): Rating {
@@ -59,8 +65,12 @@ function rate(score: number): Rating {
   return "poor";
 }
 
-function assessCrop(crop: CropProfile, means: Readonly<Record<SampleLayerId, number>>): CropAssessment {
-  const factors = SAMPLE_LAYER_ORDER.map((layer) => scoreFactor(layer, means[layer], crop));
+function assessCrop(
+  crop: CropProfile,
+  means: Readonly<Record<SampleLayerId, number>>,
+  sources: Readonly<Record<SampleLayerId, FactorSource>>,
+): CropAssessment {
+  const factors = SAMPLE_LAYER_ORDER.map((layer) => scoreFactor(layer, means[layer], crop, sources[layer]));
   const weighted = factors.reduce((sum, f) => sum + f.score * crop.weights[f.layer], 0);
   const lowest = factors.reduce((min, f) => (f.score < min.score ? f : min));
   const ceiling = lowest.score < 100 ? 99 : 100;
@@ -74,8 +84,15 @@ function assessCrop(crop: CropProfile, means: Readonly<Record<SampleLayerId, num
   };
 }
 
-/** Scores each crop for the plot from the mean SAMPLE values of the grid cells it covers. */
-export function computeAssessment(plot: PlotFeature, grid: readonly GridCell[]): Assessment {
+/**
+ * Scores each crop for the plot from the mean values of the grid cells it covers. `measured`
+ * replaces sample values with real ones where available (rainfall from NASA POWER, for now).
+ */
+export function computeAssessment(
+  plot: PlotFeature,
+  grid: readonly GridCell[],
+  measured: Partial<Record<SampleLayerId, number>> = {},
+): Assessment {
   const cells = sampleCells(plot, grid);
   if (cells.length === 0) return { kind: "outside" };
 
@@ -85,10 +102,17 @@ export function computeAssessment(plot: PlotFeature, grid: readonly GridCell[]):
       cells.reduce((sum, cell) => sum + cell.values[layer], 0) / cells.length,
     ]),
   ) as Record<SampleLayerId, number>;
+  const sources = Object.fromEntries(
+    SAMPLE_LAYER_ORDER.map((layer) => [layer, measured[layer] === undefined ? "sample" : "nasa"]),
+  ) as Record<SampleLayerId, FactorSource>;
+  for (const layer of SAMPLE_LAYER_ORDER) {
+    const value = measured[layer];
+    if (value !== undefined) means[layer] = value;
+  }
 
   return {
     kind: "ok",
     cellsSampled: cells.length,
-    crops: CROP_ORDER.map((id) => assessCrop(CROPS[id], means)),
+    crops: CROP_ORDER.map((id) => assessCrop(CROPS[id], means, sources)),
   };
 }

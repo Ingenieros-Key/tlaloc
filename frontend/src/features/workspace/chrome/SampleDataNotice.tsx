@@ -54,7 +54,7 @@ export function SampleDataNotice({ align = "start" }: { readonly align?: "start"
       >
         <Badge>
           <Info aria-hidden="true" className="size-3.5" strokeWidth={2} />
-          {t.common.sampleData}
+          {t.common.partlySample}
         </Badge>
       </button>
       <div

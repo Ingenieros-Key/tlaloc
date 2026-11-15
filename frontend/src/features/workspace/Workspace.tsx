@@ -12,7 +12,7 @@ import { DRAWER_QUERY, useMediaQuery } from "./hooks/useMediaQuery";
 import { AnalysisAnnouncer } from "./panels/AnalysisAnnouncer";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { InspectorPanel } from "./panels/InspectorPanel";
-import { WorkspaceProvider, useWorkspace, useWorkspaceDispatch, type PanelId } from "./store";
+import { WorkspaceProvider, inspectorVisible, useWorkspace, useWorkspaceDispatch, type PanelId } from "./store";
 import { t } from "./strings";
 
 /** MapLibre/deck.gl touch `window`, so the map is client-only and code-split. */
@@ -41,12 +41,17 @@ export function Workspace() {
  * inert to keep keyboard focus out of content that cannot be seen.
  */
 function Canvas() {
-  const { panels, display } = useWorkspace();
+  const state = useWorkspace();
+  const { panels, display } = state;
   const drawerLayout = useMediaQuery(DRAWER_QUERY);
   const covered = drawerLayout && (panels.browser || panels.inspector);
 
   return (
-    <main id="workspace-canvas" className="relative min-h-0 flex-1 overflow-hidden">
+    <main
+      id="workspace-canvas"
+      data-inspector={inspectorVisible(state) ? "shown" : "hidden"}
+      className="relative min-h-0 flex-1 overflow-hidden"
+    >
       <div className="absolute inset-0" data-shortcuts="map" inert={covered}>
         <MapView />
       </div>
@@ -65,9 +70,11 @@ function Canvas() {
 }
 
 function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
-  const { panels } = useWorkspace();
+  const state = useWorkspace();
+  const { panels } = state;
   const dispatch = useWorkspaceDispatch();
   const anyOpen = panels.browser || panels.inspector;
+  const showInspector = inspectorVisible(state);
 
   useEffect(() => {
     if (!anyOpen) return;
@@ -102,14 +109,11 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
       >
         <BrowserPanel />
       </Dock>
-      <Dock
-        side="right"
-        panel="inspector"
-        open={panels.inspector}
-        drawerLayout={drawerLayout}
-      >
-        <InspectorPanel />
-      </Dock>
+      {showInspector ? (
+        <Dock side="right" panel="inspector" open={panels.inspector} drawerLayout={drawerLayout}>
+          <InspectorPanel />
+        </Dock>
+      ) : null}
     </>
   );
 }

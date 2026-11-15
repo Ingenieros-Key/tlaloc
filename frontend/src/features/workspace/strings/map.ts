@@ -2,7 +2,7 @@
 export const map = {
   regionLabel: "Map of El Salvador",
   canvasLabel:
-    "Interactive map. Arrow keys pan, plus and minus zoom. With the Square tool selected, press Enter to place a plot at the map centre.",
+    "Interactive map. Arrow keys pan, Shift plus arrow keys rotate and tilt, plus and minus zoom. With the Area tool selected, press Enter to place a plot at the map centre.",
   loading: "Loading map…",
   notices: {
     tiles: {
@@ -29,6 +29,8 @@ export const map = {
     gibs: "Imagery: NASA GIBS / ESDIS",
   },
   dryDay: (max: string) => `No rain this day · max ${max} mm`,
+  millimetres: (value: string) => `${value} mm`,
+  plotReading: (day: string) => `on ${day}`,
   tooltip: {
     outsideRange: "Outside filter range",
     powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,
