@@ -1,26 +1,26 @@
 export type Lang = "en" | "es";
 
 export const landingCopy: Record<Lang, {
-  status: string;
+  tag: string;
   heading: string;
-  sub: string;
-  progress: string;
+  lead: string;
+  building: string;
   signIn: string;
   signedIn: string;
 }> = {
   en: {
-    status: "Under construction",
-    heading: "Something is growing here",
-    sub: "Tlaloc is being built. We're watering the fields — check back soon.",
-    progress: "Progress",
+    tag: "NASA Space Apps 2026",
+    heading: "Site under construction",
+    lead: "We're adapting farms with NASA data. Check back soon.",
+    building: "Building",
     signIn: "Sign in",
     signedIn: "Signed in",
   },
   es: {
-    status: "En construcción",
-    heading: "Algo está creciendo aquí",
-    sub: "Tlaloc se está construyendo. Estamos regando los campos — vuelve pronto.",
-    progress: "Progreso",
+    tag: "NASA Space Apps 2026",
+    heading: "Sitio en construcción",
+    lead: "Estamos adaptando la agricultura con datos de la NASA. Vuelve pronto.",
+    building: "Construyendo",
     signIn: "Iniciar sesión",
     signedIn: "Sesión iniciada",
   },

@@ -1,180 +1,147 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { getCurrentUser } from "aws-amplify/auth";
 import "@/lib/amplify";
 import { AuthModal } from "@/components/ui/auth-modal";
 import { landingCopy, type Lang } from "@/components/ui/i18n";
 
-const PROGRESS = 65;
-
-function GrowingScene() {
-  const reduce = useReducedMotion();
-  const drops = Array.from({ length: 10 }, (_, i) => i);
-  return (
-    <svg viewBox="0 0 200 160" className="h-44 w-44" role="img" aria-label="A seedling growing in the rain">
-      {!reduce &&
-        drops.map((i) => (
-          <motion.line
-            key={i}
-            x1={30 + i * 15}
-            y1={-10}
-            x2={26 + i * 15}
-            y2={6}
-            stroke="#1FC8B4"
-            strokeWidth={2}
-            strokeLinecap="round"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 150, opacity: [0, 0.9, 0] }}
-            transition={{ duration: 1 + (i % 4) * 0.2, delay: (i % 5) * 0.3, repeat: Infinity, ease: "linear" }}
-          />
-        ))}
-
-      <ellipse cx="100" cy="150" rx="55" ry="8" fill="#0B1033" opacity={0.1} />
-
-      <motion.g
-        style={{ transformOrigin: "100px 148px" }}
-        initial={{ scaleY: reduce ? 1 : 0, opacity: reduce ? 1 : 0 }}
-        animate={{ scaleY: 1, opacity: 1 }}
-        transition={{ duration: 1.4, ease: "easeOut" }}
-      >
-        <path d="M100 148 V92" stroke="#5DBB63" strokeWidth={5} strokeLinecap="round" />
-        <motion.path
-          d="M100 118 C78 112 70 92 72 80 C92 82 102 100 100 118 Z"
-          fill="#5DBB63"
-          initial={{ scale: reduce ? 1 : 0, opacity: reduce ? 1 : 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.6, type: "spring" }}
-          style={{ transformOrigin: "100px 118px" }}
-        />
-        <motion.path
-          d="M100 108 C122 102 130 82 128 70 C108 72 98 90 100 108 Z"
-          fill="#1FC8B4"
-          initial={{ scale: reduce ? 1 : 0, opacity: reduce ? 1 : 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.9, duration: 0.6, type: "spring" }}
-          style={{ transformOrigin: "100px 108px" }}
-        />
-        <motion.circle
-          cx="100"
-          cy="78"
-          r="6"
-          fill="#F6B93B"
-          initial={{ scale: reduce ? 1 : 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 1.2, type: "spring", stiffness: 300 }}
-        />
-      </motion.g>
-    </svg>
-  );
+const css = `
+.tl-root {
+  color: var(--hueso);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(31,200,180,0.14), transparent 60%),
+    radial-gradient(900px 500px at 85% 110%, rgba(43,58,158,0.35), transparent 60%),
+    #0b1033;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  --hueso: #f4f0e6;
+  --jade: #1fc8b4;
+  --maiz: #f6b93b;
+  --piedra: #9aa3c7;
+  --obsidiana: #060818;
 }
-
-function LangFlipper({ lang, onToggle }: { lang: Lang; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="relative h-9 w-[4.5rem] overflow-hidden rounded-full border border-white/20 bg-white/5 text-sm font-medium text-white"
-      aria-label="Toggle language"
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={lang}
-          initial={{ y: 14, opacity: 0, rotateX: -90 }}
-          animate={{ y: 0, opacity: 1, rotateX: 0 }}
-          exit={{ y: -14, opacity: 0, rotateX: 90 }}
-          transition={{ duration: 0.25 }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          {lang === "en" ? "EN" : "ES"}
-        </motion.span>
-      </AnimatePresence>
-    </button>
-  );
+.tl-auth { position: absolute; top: 1.25rem; left: 1.25rem; }
+.tl-lang {
+  position: absolute; top: 1.25rem; right: 1.25rem;
+  display: inline-flex; border: 1px solid rgba(154,163,199,0.4);
+  border-radius: 999px; overflow: hidden;
+  font-family: var(--font-plex-mono), monospace; font-size: 0.8rem;
 }
+.tl-lang button {
+  background: transparent; color: var(--piedra); border: 0;
+  padding: 0.4rem 0.8rem; cursor: pointer; letter-spacing: 0.05em;
+}
+.tl-lang button[aria-pressed="true"] { background: var(--jade); color: var(--obsidiana); font-weight: 500; }
+.tl-signin {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  border: 1px solid var(--jade); background: var(--jade); color: var(--obsidiana);
+  border-radius: 999px; padding: 0.45rem 1.1rem; cursor: pointer;
+  font-family: var(--font-plex-mono), monospace; font-size: 0.8rem; font-weight: 500;
+  letter-spacing: 0.04em; transition: opacity 0.15s;
+}
+.tl-signin:hover { opacity: 0.9; }
+.tl-chip {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  border: 1px solid rgba(31,200,180,0.4); background: rgba(31,200,180,0.12); color: var(--jade);
+  border-radius: 999px; padding: 0.45rem 1.1rem;
+  font-family: var(--font-plex-mono), monospace; font-size: 0.8rem; letter-spacing: 0.04em;
+}
+.tl-main {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 2rem 1.5rem 3rem; gap: 1.5rem;
+}
+.tl-mark { width: min(200px, 50vw); height: auto; }
+.tl-wordmark {
+  font-family: var(--font-chakra), sans-serif; font-weight: 700;
+  font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1; letter-spacing: 0.02em;
+  color: var(--hueso); margin-top: -0.25rem;
+}
+.tl-tag {
+  font-family: var(--font-plex-mono), monospace; color: var(--jade);
+  font-size: 0.8rem; letter-spacing: 0.22em; text-transform: uppercase;
+}
+.tl-h1 { font-family: var(--font-chakra), sans-serif; font-weight: 700; font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1.05; }
+.tl-lead { max-width: 40ch; color: var(--piedra); font-size: clamp(1rem, 2.5vw, 1.15rem); line-height: 1.6; }
+.tl-dot {
+  display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 999px;
+  background: var(--maiz); box-shadow: 0 0 0 0 rgba(246,185,59,0.6); animation: tl-pulse 2s infinite;
+}
+@keyframes tl-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(246,185,59,0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(246,185,59,0); }
+  100% { box-shadow: 0 0 0 0 rgba(246,185,59,0); }
+}
+.tl-status {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  font-family: var(--font-plex-mono), monospace; font-size: 0.85rem; color: var(--hueso);
+}
+.tl-footer {
+  text-align: center; padding: 1.5rem; color: rgba(154,163,199,0.6);
+  font-size: 0.75rem; font-family: var(--font-plex-mono), monospace;
+}
+.tl-footer a { color: var(--jade); text-decoration: none; }
+@media (prefers-reduced-motion: reduce) { .tl-dot { animation: none; } }
+`;
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   const [modalOpen, setModalOpen] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [auth, setAuth] = useState<"loading" | "in" | "out">("loading");
   const t = landingCopy[lang];
 
   const refresh = () =>
     getCurrentUser()
-      .then(() => setAuthed(true))
-      .catch(() => setAuthed(false));
+      .then(() => setAuth("in"))
+      .catch(() => setAuth("out"));
 
   useEffect(() => {
     refresh();
   }, []);
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-gradient-to-b from-[#0B1033] via-[#0B1033] to-[#122152] text-white">
-      <header className="flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-3">
-          <img src="/tlaloc-icon.svg" alt="Tlaloc" className="h-9 w-9" />
-          <span className="text-lg font-semibold tracking-tight">Tlaloc</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <LangFlipper lang={lang} onToggle={() => setLang((l) => (l === "en" ? "es" : "en"))} />
-          {authed ? (
-            <span className="flex items-center gap-2 rounded-full bg-[#1FC8B4]/15 px-3 py-1.5 text-sm font-medium text-[#1FC8B4]">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M20 21a8 8 0 0 0-16 0" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              {t.signedIn}
-            </span>
-          ) : (
-            <motion.button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              whileTap={{ scale: 0.97 }}
-              className="rounded-full bg-[#1FC8B4] px-5 py-2 text-sm font-semibold text-[#0B1033] hover:bg-[#1FC8B4]/90"
-            >
-              {t.signIn}
-            </motion.button>
-          )}
-        </div>
-      </header>
+    <div className="tl-root">
+      <style>{css}</style>
 
-      <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-20 text-center">
-        <GrowingScene />
+      <div className="tl-auth">
+        {auth === "loading" ? (
+          <img src="/tlaloc-loader.svg" alt="" aria-hidden width={32} height={32} />
+        ) : auth === "in" ? (
+          <span className="tl-chip">
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M20 21a8 8 0 0 0-16 0" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            {t.signedIn}
+          </span>
+        ) : (
+          <button type="button" className="tl-signin" onClick={() => setModalOpen(true)}>
+            {t.signIn}
+          </button>
+        )}
+      </div>
 
-        <span className="rounded-full border border-[#F6B93B]/40 bg-[#F6B93B]/10 px-4 py-1 text-sm font-medium text-[#F6B93B]">
-          {t.status}
+      <div className="tl-lang" role="group" aria-label="Language">
+        <button data-lang="es" aria-pressed={lang === "es"} onClick={() => setLang("es")}>ES</button>
+        <button data-lang="en" aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
+      </div>
+
+      <main className="tl-main">
+        <img className="tl-mark" src="/tlaloc-mark.svg" alt="Tlaloc" />
+        <p className="tl-wordmark">Tlaloc</p>
+        <span className="tl-tag">{t.tag}</span>
+        <h1 className="tl-h1">{t.heading}</h1>
+        <p className="tl-lead">{t.lead}</p>
+        <span className="tl-status">
+          <span className="tl-dot" aria-hidden />
+          <span>{t.building}</span>
         </span>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={lang}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25 }}
-            className="max-w-xl"
-          >
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{t.heading}</h1>
-            <p className="mt-4 text-lg text-white/70">{t.sub}</p>
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="w-full max-w-md">
-          <div className="mb-2 flex justify-between text-sm text-white/60">
-            <span>{t.progress}</span>
-            <span>{PROGRESS}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-[#5DBB63] via-[#1FC8B4] to-[#F6B93B]"
-              initial={{ width: 0 }}
-              animate={{ width: `${PROGRESS}%` }}
-              transition={{ duration: 1.6, ease: "easeOut", delay: 0.3 }}
-            />
-          </div>
-        </div>
       </main>
+
+      <footer className="tl-footer">
+        tlaloc.space · <a href="mailto:info@tlaloc.space">info@tlaloc.space</a>
+      </footer>
 
       <AuthModal open={modalOpen} onClose={() => setModalOpen(false)} lang={lang} onAuthed={refresh} />
     </div>

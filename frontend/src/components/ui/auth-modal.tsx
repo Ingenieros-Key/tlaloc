@@ -273,9 +273,20 @@ export function AuthModal({
                   type="submit"
                   disabled={loading}
                   whileTap={reduce ? undefined : { scale: 0.98 }}
-                  className="w-full rounded-xl bg-[#0B1033] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#122152] disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0B1033] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#122152] disabled:opacity-60"
                 >
-                  {loading ? t.working : mode === "signup" ? t.submitSignUp : mode === "confirm" ? t.submitConfirm : t.submitSignIn}
+                  {loading ? (
+                    <>
+                      <img src="/tlaloc-loader.svg" alt="" aria-hidden className="h-5 w-5" />
+                      {t.working}
+                    </>
+                  ) : mode === "signup" ? (
+                    t.submitSignUp
+                  ) : mode === "confirm" ? (
+                    t.submitConfirm
+                  ) : (
+                    t.submitSignIn
+                  )}
                 </motion.button>
               </form>
             </div>
