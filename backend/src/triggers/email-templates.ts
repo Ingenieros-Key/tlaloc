@@ -18,7 +18,8 @@ const COLORS = {
   muted: '#6b7280',
 };
 
-const FONT_STACK = "'Chakra Petch','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const BODY_FONT = "'IBM Plex Sans','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const DISPLAY_FONT = "'Chakra Petch','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /** Normalize a Cognito `locale` attribute (e.g. "es-SV") to a supported Lang; default English. */
 export function resolveLang(locale: string | undefined): Lang {
@@ -65,9 +66,9 @@ function shell(opts: {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&display=swap');</style>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');</style>
   </head>
-  <body style="margin:0;padding:0;background:${COLORS.noche};font-family:${FONT_STACK};">
+  <body style="margin:0;padding:0;background:${COLORS.noche};font-family:${BODY_FONT};">
     <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${opts.preheader}</span>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.noche};padding:32px 16px;">
       <tr>
@@ -76,7 +77,7 @@ function shell(opts: {
             <tr>
               <td align="center" style="background:${COLORS.noche};padding:32px 24px 24px;">
                 <img src="${LOGO_URL}" width="108" height="108" alt="Tlaloc" style="display:block;border:0;border-radius:20px;" />
-                <div style="color:${COLORS.hueso};font-size:28px;font-weight:700;letter-spacing:0.02em;margin-top:12px;">Tlaloc</div>
+                <div style="color:${COLORS.hueso};font-family:${DISPLAY_FONT};font-size:28px;font-weight:700;letter-spacing:0.02em;margin-top:12px;">Tlaloc</div>
               </td>
             </tr>
             ${codeRow}
@@ -156,7 +157,7 @@ const welcomeCopy: Record<Lang, { subject: string; preheader: string; blocks: st
     preheader: 'Turning NASA Earth science into local food resilience',
     cta: 'Explore Tlaloc',
     blocks: `
-      <h2 style="margin:0 0 10px;font-size:20px;color:${COLORS.noche};">Welcome to Tlaloc!</h2>
+      <h2 style="margin:0 0 10px;font-family:${DISPLAY_FONT};font-size:22px;color:${COLORS.noche};">Welcome to Tlaloc!</h2>
       <p style="margin:0 0 12px;">Tlaloc is an agricultural decision-support app for smallholder farmers in El Salvador. It combines NASA climate data (NASA POWER), weather forecasts and farmers' own field records to answer one key question: <strong>which crop is better suited to my land and the conditions ahead?</strong></p>
       <p style="margin:0;">Its initial focus is maize, beans, sorghum and sugar cane. Tlaloc turns the historical archive into dry, typical and wet scenarios so you can compare crop suitability, and connects that context to your parcel boundaries, cultivation history, water availability and your planting, irrigation, fertilization and harvest records. Our impact is local: more informed decisions and stronger food resilience (SDG 2: Zero Hunger).</p>`,
   },
@@ -165,7 +166,7 @@ const welcomeCopy: Record<Lang, { subject: string; preheader: string; blocks: st
     preheader: 'Convertimos la ciencia de la Tierra de la NASA en resiliencia alimentaria local',
     cta: 'Explora Tlaloc',
     blocks: `
-      <h2 style="margin:0 0 10px;font-size:20px;color:${COLORS.noche};">¡Bienvenido a Tlaloc!</h2>
+      <h2 style="margin:0 0 10px;font-family:${DISPLAY_FONT};font-size:22px;color:${COLORS.noche};">¡Bienvenido a Tlaloc!</h2>
       <p style="margin:0 0 12px;">Tlaloc es una aplicación de apoyo a la decisión agrícola para pequeños productores de El Salvador. Combina datos climáticos de la NASA (NASA POWER), pronósticos del tiempo y los registros del propio agricultor para responder una pregunta clave: <strong>¿qué cultivo se adapta mejor a mi terreno y a las condiciones que vienen?</strong></p>
       <p style="margin:0;">Su enfoque inicial son maíz, frijol, sorgo y caña de azúcar. Tlaloc traduce el archivo histórico en escenarios seco, típico y húmedo para comparar la aptitud de cada cultivo, y conecta ese contexto con los límites de tu parcela, tu historial de cultivo, la disponibilidad de agua y tus registros de siembra, riego, fertilización y cosecha. Nuestro impacto es local: decisiones más informadas y mayor resiliencia alimentaria (ODS 2: Hambre Cero).</p>`,
   },
