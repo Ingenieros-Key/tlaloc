@@ -46,7 +46,7 @@ export const browser = {
     scoreLegend: "Outlook score",
     scoreEnds: { poor: "Poor · under 45", fair: "Fair", good: "Good · 70+" },
     scoreNote:
-      "Every cell is scored like a plot's outlook: NASA POWER temperature, humidity and rainfall over the last 12 months. Soil condition is simulated.",
+      "Every cell is scored like a plot's outlook, with the crop viability model: NASA POWER temperature, rainfall and humidity over the last 12 months, and NASA SRTM elevation.",
   },
   showLayer: (layer: string) => `Show ${layer}`,
   /** Screen-reader note on a layer row: expanding it also changes what the map shows. */

@@ -27,6 +27,7 @@ function announcement(hasPlot: boolean, analysis: AnalysisState): string {
   if (analysis.status === "running") return t.inspector.announceRunning;
   if (analysis.status !== "done") return "";
   if (analysis.result.kind === "outside") return t.inspector.announceOutside;
+  if (analysis.result.kind === "missing") return t.inspector.announceMissing;
   const best = bestCrops(analysis.result.crops);
   const first = best[0];
   if (!first) return "";
