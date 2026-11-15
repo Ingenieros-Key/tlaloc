@@ -6,6 +6,7 @@ import { getCurrentUser, signOut } from "aws-amplify/auth";
 import "@/lib/amplify";
 import { AuthModal } from "@/components/ui/auth-modal";
 import { landingCopy, type Lang } from "@/components/ui/i18n";
+import { applyTheme, readStoredTheme, type Theme } from "@/lib/theme";
 
 const css = `
 .tl-root {
@@ -128,7 +129,7 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>("es");
   const [modalOpen, setModalOpen] = useState(false);
   const [auth, setAuth] = useState<"loading" | "in" | "out">("loading");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<Theme>("dark");
   const t = landingCopy[lang];
 
   const refresh = () =>
@@ -138,14 +139,15 @@ export default function Home() {
 
   useEffect(() => {
     refresh();
-    const saved = localStorage.getItem("tl-theme");
-    if (saved === "light" || saved === "dark") setTheme(saved);
+    const saved = readStoredTheme();
+    setTheme(saved);
+    applyTheme(saved);
   }, []);
 
   const toggleTheme = () =>
     setTheme((p) => {
-      const next = p === "dark" ? "light" : "dark";
-      localStorage.setItem("tl-theme", next);
+      const next: Theme = p === "dark" ? "light" : "dark";
+      applyTheme(next);
       return next;
     });
 
@@ -158,7 +160,7 @@ export default function Home() {
           <img src="/tlaloc-loader.svg" alt="" aria-hidden width={32} height={32} />
         ) : auth === "in" ? (
           <div className="tl-brand">
-            <img src="/tlaloc-mascot.png" alt="Tlaloc" />
+            <img src="/favicon.svg" alt="Tlaloc" />
             <span>Tlaloc</span>
           </div>
         ) : (

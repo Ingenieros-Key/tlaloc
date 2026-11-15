@@ -10,6 +10,10 @@ export const chrome = {
     openLayers: "Layers",
     openResults: "Results",
     signIn: "Sign in",
+    signedIn: "Signed in",
+    signOut: "Sign out",
+    home: "Home",
+    theme: "Toggle theme",
   },
   ribbon: {
     label: "Workspace tools",

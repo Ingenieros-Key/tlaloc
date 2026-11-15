@@ -170,6 +170,7 @@ export function AuthModal({
                 <CloseIcon />
               </button>
 
+              <div className="flex min-h-full flex-col justify-center">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={lang + mode}
@@ -295,6 +296,7 @@ export function AuthModal({
                   )}
                 </motion.button>
               </form>
+              </div>
             </div>
           </motion.div>
         </motion.div>
