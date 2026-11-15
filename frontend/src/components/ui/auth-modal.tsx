@@ -151,7 +151,7 @@ export function AuthModal({
             role="dialog"
             aria-modal="true"
             aria-label={mode === "signup" ? t.signUpTitle : mode === "confirm" ? t.confirmTitle : t.signInTitle}
-            className="flex max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="flex h-[34rem] max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 16 }}
             animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
