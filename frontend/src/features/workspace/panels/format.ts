@@ -1,3 +1,4 @@
+import { parsePowerDate, type PowerDate } from "@/lib/nasa-power";
 import { DEFAULT_LAYER_OPACITY, formatValue } from "../layers";
 import { t } from "../strings";
 import type { LayerDef, LayerSettings } from "../types";
@@ -24,6 +25,15 @@ export function formatCentroid([lng, lat]: readonly [number, number]): string {
   const latText = t.inspector.coordinate(deg(lat), lat >= 0 ? north : south);
   const lngText = t.inspector.coordinate(deg(lng), lng >= 0 ? east : west);
   return `${latText}, ${lngText}`;
+}
+
+/** "Nov 12, 2026" from a POWER "YYYYMMDD" date; `short` drops the year ("Nov 12"). */
+export function formatDay(date: PowerDate, short = false): string {
+  return parsePowerDate(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: short ? undefined : "numeric",
+  });
 }
 
 /** Layer value with its unit, e.g. "1,850 mm/yr". */

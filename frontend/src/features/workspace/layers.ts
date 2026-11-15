@@ -1,9 +1,21 @@
-import type { LayerDef, LayerId, LayerSettings, Rgba } from "./types";
+import type { AnyLayerId, LayerDef, LayerId, LayerSettings, Rgba, SampleLayerId } from "./types";
 
-export const LAYER_ORDER: readonly LayerId[] = ["humidity", "rain", "soil"];
+/** Sample-grid layers, in the order the crop assessment lists its factors. */
+export const SAMPLE_LAYER_ORDER: readonly SampleLayerId[] = ["humidity", "rain", "soil"];
 
-/** Sample-data layer definitions. Ramps are tuned for the dark basemap. */
-export const LAYERS: Readonly<Record<LayerId, LayerDef>> = {
+/** Layers listed in the Browser and drawable on the map. */
+export const LAYER_ORDER: readonly LayerId[] = ["precip"];
+
+/** Layers whose values come from a live API instead of the sample grid. */
+export function isLiveLayer(id: AnyLayerId): id is "precip" {
+  return id === "precip";
+}
+
+/**
+ * Layer definitions. The sample ones are no longer drawn, but still give the crop outlook its
+ * domains, units and labels.
+ */
+export const LAYERS: Readonly<Record<AnyLayerId, LayerDef>> = {
   humidity: {
     id: "humidity",
     domain: [40, 95],
@@ -26,6 +38,20 @@ export const LAYERS: Readonly<Record<LayerId, LayerDef>> = {
       [10, 114, 104, 255],
       [31, 200, 180, 255],
       [214, 246, 236, 255],
+    ],
+  },
+  // NASA POWER PRECTOTCORR for one day. Dry cells fade out so rain events stand out on either
+  // basemap; heavy days in El Salvador's rainy season reach 40-60 mm.
+  precip: {
+    id: "precip",
+    domain: [0, 40],
+    unit: "mm",
+    precision: 1,
+    ramp: [
+      [120, 200, 240, 30],
+      [64, 160, 222, 170],
+      [30, 100, 220, 225],
+      [96, 64, 204, 255],
     ],
   },
   soil: {
@@ -73,7 +99,7 @@ export function rampColor(layer: LayerDef, value: number): Rgba {
 /** CSS linear-gradient for legends, left → right = domain min → max. */
 export function rampGradient(layer: LayerDef): string {
   const parts = layer.ramp.map(
-    (c, i) => `rgb(${c[0]} ${c[1]} ${c[2]}) ${Math.round((i / (layer.ramp.length - 1)) * 100)}%`,
+    (c, i) => `rgb(${c[0]} ${c[1]} ${c[2]} / ${(c[3] / 255).toFixed(2)}) ${Math.round((i / (layer.ramp.length - 1)) * 100)}%`,
   );
   return `linear-gradient(90deg, ${parts.join(", ")})`;
 }

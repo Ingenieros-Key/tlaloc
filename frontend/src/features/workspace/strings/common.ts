@@ -1,19 +1,19 @@
-import type { CropId, LayerId, Rating } from "../types";
+import type { AnyLayerId, CropId, LayerId, Rating } from "../types";
 
 /** Shared vocabulary. Owned by the contract; module agents read but do not edit. */
 export const common = {
   appName: "Tlaloc",
   sampleData: "Sample data",
-  sampleDataHint: "Values are simulated for demonstration. No real NASA data is connected yet.",
+  sampleDataHint:
+    "The precipitation layer is live NASA POWER data. Crop outlook scores still use simulated humidity, rainfall and soil values for demonstration.",
   layers: {
     humidity: "Humidity",
     rain: "Rainfall",
+    precip: "Precipitation",
     soil: "Soil condition",
-  } satisfies Record<LayerId, string>,
+  } satisfies Record<AnyLayerId, string>,
   layerDescriptions: {
-    humidity: "Mean relative humidity",
-    rain: "Annual precipitation",
-    soil: "Composite soil health index",
+    precip: "NASA POWER, daily",
   } satisfies Record<LayerId, string>,
   crops: {
     corn: "Corn",

@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { PickingInfo } from "@deck.gl/core";
+import type { Layer, PickingInfo } from "@deck.gl/core";
 import { MapLibreOverlay } from "@deck.gl/maplibre";
 import { CloudOff, LoaderCircle, X } from "lucide-react";
 import {
@@ -12,15 +12,22 @@ import {
   type ErrorEvent as MapErrorEvent,
   type MapMouseEvent,
 } from "maplibre-gl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TerraDraw } from "terra-draw";
 import type { Theme } from "@/lib/theme";
-import { getSampleGrid } from "../data/sample-grid";
 import { useAppTheme } from "../hooks/useAppTheme";
+import { formatDay } from "../panels/format";
 import { LAYERS, formatValue } from "../layers";
-import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
+import {
+  precipDayIndex,
+  stepMs,
+  useMapController,
+  useWorkspace,
+  useWorkspaceDispatch,
+  type WorkspaceState,
+} from "../store";
 import { t } from "../strings";
-import type { Basemap, GridCell, LayerId, LayerSettings, MapController, ViewState } from "../types";
+import type { Basemap, DataField, LayerId, LayerSettings, MapController, ViewState } from "../types";
 import { IconButton } from "../ui/IconButton";
 import {
   FALLBACK_STYLE,
@@ -66,7 +73,8 @@ import {
 setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
 
 type Hover = {
-  readonly cell: GridCell;
+  /** Index of the hovered cell in the active field. */
+  readonly index: number;
   readonly x: number;
   readonly y: number;
   /** Render to the left of the pointer when it is near the right edge. */
@@ -101,6 +109,50 @@ function roundView(map: MapLibreMap): ViewState {
   };
 }
 
+/** Deck layers for the current state and field (empty during globe flights). */
+function deckLayersFor(
+  s: WorkspaceState,
+  field: DataField | null,
+  beforeId: string | undefined,
+  globe: boolean,
+): Layer[] {
+  if (globe) return [];
+  return buildDeckLayers({
+    field,
+    activeLayer: s.activeLayer,
+    layerSettings: s.layerSettings,
+    style: s.dataStyle,
+    zoom: s.view.zoom,
+    beforeId,
+    display: s.display,
+  });
+}
+
+/** Heatmap hover: the cell whose centre is nearest the pointer, if one is within about 4 km. */
+function nearestCell(field: DataField, [lng, lat]: readonly number[]): number | null {
+  let best = -1;
+  let bestDist = 0.04 ** 2;
+  field.cells.forEach(({ center }, i) => {
+    const d = (center[0] - lng) ** 2 + (center[1] - lat) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  });
+  return best >= 0 ? best : null;
+}
+
+/** Linear blend between two days; a missing value on either side takes the other side. */
+function blend(from: Float32Array, to: Float32Array, t: number): Float32Array {
+  const out = new Float32Array(to.length);
+  for (let i = 0; i < to.length; i += 1) {
+    const a = from[i];
+    const b = to[i];
+    out[i] = Number.isNaN(a) ? b : Number.isNaN(b) ? NaN : a + (b - a) * t;
+  }
+  return out;
+}
+
 /**
  * The workspace map: MapLibre basemap (OpenFreeMap dark/Positron following the app theme, or NASA
  * GIBS), interleaved deck.gl sample
@@ -111,7 +163,11 @@ export function MapView() {
   const state = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const { register } = useMapController();
-  const { activeLayer, layerSettings, basemap, is3d, tool, plot, pin, picking, display } = state;
+  const { activeLayer, layerSettings, dataStyle, precip, precipPlaying, precipSpeed, basemap, is3d, tool, plot, pin, picking, display } =
+    state;
+  const dayIndex = precipDayIndex(state);
+  const frames = precip.status === "ready" ? precip.frames : null;
+  const dayValues = frames?.values[dayIndex] ?? null;
   const theme = useAppTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -132,6 +188,9 @@ export function MapView() {
    * projection and deck layers stay hidden until it lands.
    */
   const globeRef = useRef(false);
+  /** Values on screen. Usually the selected day; mid-blend while the timeline plays. */
+  const fieldRef = useRef<DataField | null>(null);
+  const fieldVersionRef = useRef(0);
 
   const [beforeId, setBeforeId] = useState<string | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
@@ -139,13 +198,6 @@ export function MapView() {
   const [notice, setNotice] = useState<NoticeKind | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
   const [globeActive, setGlobeActive] = useState(false);
-
-  const cells = useMemo(() => getSampleGrid(), []);
-  // deck.gl's interleaved polygons tear on the globe, so the data waits for the flat map.
-  const layers = useMemo(
-    () => (globeActive ? [] : buildDeckLayers({ cells, activeLayer, layerSettings, beforeId, display })),
-    [globeActive, cells, activeLayer, layerSettings, beforeId, display],
-  );
 
   useEffect(() => {
     stateRef.current = state;
@@ -193,17 +245,8 @@ export function MapView() {
     mapRef.current = map;
     let moveFrame = 0;
 
-    const currentLayers = () => {
-      if (globeRef.current) return [];
-      const s = stateRef.current;
-      return buildDeckLayers({
-        cells,
-        activeLayer: s.activeLayer,
-        layerSettings: s.layerSettings,
-        beforeId: beforeIdRef.current,
-        display: s.display,
-      });
-    };
+    const currentLayers = () =>
+      deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current);
 
     // Globe flights. The intro starts in globe mode (set above); "Go to" enters it on demand.
     let introTimer = 0;
@@ -251,13 +294,19 @@ export function MapView() {
     };
 
     const onHover = (info: PickingInfo) => {
-      const cell = info.layer?.id === DATA_LAYER_ID ? (info.object as GridCell | undefined) : undefined;
-      if (!cell) {
+      const field = fieldRef.current;
+      let index: number | null = null;
+      if (info.layer?.id === DATA_LAYER_ID && info.index >= 0) index = info.index;
+      // The heatmap is not pickable, so look up the cell under the pointer instead.
+      else if (field && info.coordinate && stateRef.current.dataStyle === "heatmap") {
+        index = nearestCell(field, info.coordinate);
+      }
+      if (index === null) {
         setHover(null);
         return;
       }
       const flip = info.x > map.getContainer().clientWidth - TOOLTIP_FLIP_MARGIN;
-      setHover({ cell, x: info.x, y: info.y, flip });
+      setHover({ index, x: info.x, y: info.y, flip });
     };
 
     const onStyleLoad = () => {
@@ -491,11 +540,52 @@ export function MapView() {
       mapRef.current = null;
       map.remove();
     };
-  }, [cells, dispatch, register]);
+  }, [dispatch, register]);
 
+  // Settings that change the deck layers (the field itself is pushed by the effect below).
+  const heatmapZoom = dataStyle === "heatmap" ? state.view.zoom : 0;
   useEffect(() => {
-    overlayRef.current?.setProps({ layers });
-  }, [layers]);
+    overlayRef.current?.setProps({
+      layers: deckLayersFor(stateRef.current, fieldRef.current, beforeId, globeActive),
+    });
+  }, [globeActive, activeLayer, layerSettings, dataStyle, heatmapZoom, beforeId, display]);
+
+  // The selected day's values. While the timeline plays, the map blends from what is on screen to
+  // the new day over one step, so playback moves continuously instead of jumping day to day.
+  const dayCount = frames?.dates.length ?? 0;
+  useEffect(() => {
+    const push = () =>
+      overlayRef.current?.setProps({
+        layers: deckLayersFor(stateRef.current, fieldRef.current, beforeIdRef.current, globeRef.current),
+      });
+    const nextVersion = () => (fieldVersionRef.current += 1);
+
+    if (!frames || !dayValues) {
+      fieldRef.current = null;
+      push();
+      return;
+    }
+    const cells = frames.hexes;
+    const prev = fieldRef.current;
+    const duration = motionMs(stepMs(dayCount, precipSpeed));
+    if (!precipPlaying || !prev || prev.cells !== cells || duration === 0) {
+      fieldRef.current = { cells, values: dayValues, version: nextVersion() };
+      push();
+      return;
+    }
+
+    const from = prev.values;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      fieldRef.current = { cells, values: t >= 1 ? dayValues : blend(from, dayValues, t), version: nextVersion() };
+      push();
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [frames, dayValues, precipPlaying, dayCount, precipSpeed]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -536,20 +626,11 @@ export function MapView() {
     if (drawRef.current) stopTerraDraw(drawRef.current);
     drawRef.current = null;
     beforeIdRef.current = undefined;
-    const s = stateRef.current;
     overlayRef.current?.setProps({
-      layers: globeRef.current
-        ? []
-        : buildDeckLayers({
-            cells,
-            activeLayer: s.activeLayer,
-            layerSettings: s.layerSettings,
-            beforeId: undefined,
-            display: s.display,
-          }),
+      layers: deckLayersFor(stateRef.current, fieldRef.current, undefined, globeRef.current),
     });
     map.setStyle(basemapStyle(basemap, theme), { diff: false });
-  }, [basemap, theme, cells]);
+  }, [basemap, theme]);
 
   // "Go to" pin: a draggable DOM marker, so it survives basemap/theme style swaps untouched.
   // Dragging it updates the pin (and so the Go to fields); the camera stays put.
@@ -627,7 +708,18 @@ export function MapView() {
     <div role="region" aria-label={t.map.regionLabel} className="absolute inset-0 bg-bg">
       <div id={MAP_CONTAINER_ID} ref={containerRef} className="h-full w-full" />
       {hover && activeLayer && display.tooltips ? (
-        <CellTooltip hover={hover} layer={activeLayer} settings={layerSettings[activeLayer]} />
+        <CellTooltip
+          hover={hover}
+          layer={activeLayer}
+          settings={layerSettings[activeLayer]}
+          // Read the value from the frame on screen, so it follows the timeline while playing.
+          value={dayValues && !Number.isNaN(dayValues[hover.index]) ? dayValues[hover.index] : undefined}
+          caption={
+            precip.status === "ready" && precip.frames.dates[dayIndex]
+              ? t.map.tooltip.powerSource(formatDay(precip.frames.dates[dayIndex]))
+              : t.common.sampleData
+          }
+        />
       ) : null}
       {spinning ? <LoadingIndicator label={t.map.loading} /> : null}
       {switching ? <LoadingIndicator label={t.map.switchingBasemap} compact /> : null}
@@ -640,13 +732,18 @@ function CellTooltip({
   hover,
   layer,
   settings,
+  value,
+  caption,
 }: {
   readonly hover: Hover;
   readonly layer: LayerId;
   readonly settings: LayerSettings;
+  /** Undefined when the hovered cell has no data in the current frame. */
+  readonly value: number | undefined;
+  readonly caption: string;
 }) {
+  if (value === undefined) return null;
   const def = LAYERS[layer];
-  const value = hover.cell.values[layer];
   const outside = value < settings.range[0] || value > settings.range[1];
   const offset = 14;
   const transform = hover.flip
@@ -665,7 +762,9 @@ function CellTooltip({
         {formatValue(def, value)} <span className="text-xs text-muted">{def.unit}</span>
       </p>
       {outside ? <p className="text-[11px] text-fair">{t.map.tooltip.outsideRange}</p> : null}
-      <p className="text-[11px] text-muted">{t.common.sampleData}</p>
+      <p className="text-[11px] text-muted">
+        {caption}
+      </p>
     </div>
   );
 }

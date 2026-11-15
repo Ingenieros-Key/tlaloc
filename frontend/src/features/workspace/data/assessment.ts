@@ -1,12 +1,12 @@
 import { bbox, booleanPointInPolygon, centroid } from "@turf/turf";
-import { LAYERS, LAYER_ORDER } from "../layers";
+import { LAYERS, SAMPLE_LAYER_ORDER } from "../layers";
 import type { Position } from "geojson";
 import type {
   Assessment,
   CropAssessment,
   FactorScore,
   GridCell,
-  LayerId,
+  SampleLayerId,
   PlotFeature,
   Rating,
 } from "../types";
@@ -42,7 +42,7 @@ function cellUnder([lng, lat]: Position, grid: readonly GridCell[]): readonly Gr
   return hit ? [hit] : [];
 }
 
-function scoreFactor(layer: LayerId, value: number, crop: CropProfile): FactorScore {
+function scoreFactor(layer: SampleLayerId, value: number, crop: CropProfile): FactorScore {
   const [lo, hi] = crop.ideal[layer];
   const [dMin, dMax] = LAYERS[layer].domain;
   const tolerance = (dMax - dMin) * FACTOR_TOLERANCE;
@@ -59,8 +59,8 @@ function rate(score: number): Rating {
   return "poor";
 }
 
-function assessCrop(crop: CropProfile, means: Readonly<Record<LayerId, number>>): CropAssessment {
-  const factors = LAYER_ORDER.map((layer) => scoreFactor(layer, means[layer], crop));
+function assessCrop(crop: CropProfile, means: Readonly<Record<SampleLayerId, number>>): CropAssessment {
+  const factors = SAMPLE_LAYER_ORDER.map((layer) => scoreFactor(layer, means[layer], crop));
   const weighted = factors.reduce((sum, f) => sum + f.score * crop.weights[f.layer], 0);
   const lowest = factors.reduce((min, f) => (f.score < min.score ? f : min));
   const ceiling = lowest.score < 100 ? 99 : 100;
@@ -80,11 +80,11 @@ export function computeAssessment(plot: PlotFeature, grid: readonly GridCell[]):
   if (cells.length === 0) return { kind: "outside" };
 
   const means = Object.fromEntries(
-    LAYER_ORDER.map((layer) => [
+    SAMPLE_LAYER_ORDER.map((layer) => [
       layer,
       cells.reduce((sum, cell) => sum + cell.values[layer], 0) / cells.length,
     ]),
-  ) as Record<LayerId, number>;
+  ) as Record<SampleLayerId, number>;
 
   return {
     kind: "ok",

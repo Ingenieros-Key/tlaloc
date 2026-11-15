@@ -2,14 +2,18 @@
 
 import { ChevronDown, Eye, EyeOff, RotateCcw } from "lucide-react";
 import { useRef } from "react";
-import { LAYERS } from "../layers";
+import { LAYERS, isLiveLayer } from "../layers";
 import { useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
-import type { LayerId } from "../types";
+import type { DataStyle, LayerId } from "../types";
+import { Badge } from "../ui/Badge";
 import { IconButton } from "../ui/IconButton";
+import { Segmented } from "../ui/Segmented";
 import { isDefaultSettings } from "./format";
 import { Legend } from "./Legend";
 import { OpacitySlider } from "./OpacitySlider";
+import { PrecipDetail, RetryButton } from "./PrecipDetail";
+import { PrecipTimeline } from "./PrecipTimeline";
 import { RangeSlider } from "./RangeSlider";
 
 /**
@@ -18,7 +22,7 @@ import { RangeSlider } from "./RangeSlider";
  * controls.
  */
 export function LayerRow({ id }: { readonly id: LayerId }) {
-  const { activeLayer, layerSettings, display } = useWorkspace();
+  const { activeLayer, layerSettings, display, precip, dataStyle } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -29,6 +33,7 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
   const detailsId = `layer-${id}-details`;
   const hintId = `layer-${id}-hint`;
   const customized = !isDefaultSettings(layer, settings);
+  const live = isLiveLayer(id);
 
   const toggle = () => dispatch({ type: "setActiveLayer", layer: active ? null : id });
 
@@ -54,7 +59,16 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
           className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors duration-150 hover:bg-surface-3"
         >
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium text-text">{name}</span>
+            <span className="flex items-center gap-1.5">
+              <span className="truncate text-[13px] font-medium text-text">{name}</span>
+              {live ? (
+                <span title={t.browser.precip.badgeHint}>
+                  <Badge tone="accent" className="px-1 py-0 text-[10px] tracking-wide">
+                    {t.browser.precip.badge}
+                  </Badge>
+                </span>
+              ) : null}
+            </span>
             <span className="block truncate text-xs text-muted">{t.common.layerDescriptions[id]}</span>
           </span>
           <ChevronDown
@@ -81,16 +95,43 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
       >
         <div className="min-h-0 overflow-hidden">
           <div className="space-y-3 border-b border-line bg-surface-2 px-3 pb-3 pt-2">
+            {live && precip.status === "loading" ? (
+              <p role="status" className="text-xs text-muted">
+                {t.browser.precip.loading}
+              </p>
+            ) : null}
+            {live && precip.status === "error" ? (
+              <div role="alert" className="flex items-start justify-between gap-2 text-xs">
+                <p className="text-poor">{t.browser.precip.error}</p>
+                <RetryButton onClick={precip.retry} />
+              </div>
+            ) : null}
+            {live ? <PrecipTimeline /> : null}
+            <Segmented<DataStyle>
+              label={t.browser.style}
+              showLabel
+              value={dataStyle}
+              options={[
+                { value: "hexagons", label: t.browser.styles.hexagons },
+                { value: "heatmap", label: t.browser.styles.heatmap },
+              ]}
+              onChange={(style) => dispatch({ type: "setDataStyle", style })}
+            />
             {display.legends ? <Legend layer={layer} range={settings.range} /> : null}
+            {live && precip.status === "ready" ? (
+              <p className="text-[11px] leading-snug text-muted">{t.browser.precip.resolution}</p>
+            ) : null}
             <OpacitySlider
               opacity={settings.opacity}
               onChange={(opacity) => dispatch({ type: "setLayerOpacity", layer: id, opacity })}
             />
-            <RangeSlider
-              layer={layer}
-              range={settings.range}
-              onChange={(range) => dispatch({ type: "setLayerRange", layer: id, range })}
-            />
+            {dataStyle === "hexagons" ? (
+              <RangeSlider
+                layer={layer}
+                range={settings.range}
+                onChange={(range) => dispatch({ type: "setLayerRange", layer: id, range })}
+              />
+            ) : null}
             {customized ? (
               <div className="flex justify-end">
                 <button
@@ -107,6 +148,7 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
                 </button>
               </div>
             ) : null}
+            {live && active ? <PrecipDetail /> : null}
           </div>
         </div>
       </div>

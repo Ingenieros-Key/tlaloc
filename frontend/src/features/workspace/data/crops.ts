@@ -1,4 +1,4 @@
-import type { CropId, LayerId } from "../types";
+import type { CropId, SampleLayerId } from "../types";
 
 /** Inclusive ideal band for one layer, in that layer's units. */
 type IdealBand = readonly [number, number];
@@ -6,9 +6,9 @@ type IdealBand = readonly [number, number];
 /** Agronomic profile of a crop: the band where each factor is ideal and how much it matters. */
 export type CropProfile = {
   readonly id: CropId;
-  readonly ideal: Readonly<Record<LayerId, IdealBand>>;
+  readonly ideal: Readonly<Record<SampleLayerId, IdealBand>>;
   /** Relative importance of each factor; sums to 1. */
-  readonly weights: Readonly<Record<LayerId, number>>;
+  readonly weights: Readonly<Record<SampleLayerId, number>>;
 };
 
 /** Display and evaluation order of crops. */

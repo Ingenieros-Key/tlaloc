@@ -7,11 +7,11 @@ export const map = {
   notices: {
     tiles: {
       title: "Some map tiles could not load",
-      body: "The basemap may be incomplete. Sample data layers still work.",
+      body: "The basemap may be incomplete. Data layers still work.",
     },
     style: {
       title: "The basemap could not load",
-      body: "Showing a plain background instead. Sample data, drawing and analysis still work.",
+      body: "Showing a plain background instead. Data layers, drawing and analysis still work.",
     },
     slow: {
       title: "The map is taking a long time to load",
@@ -30,5 +30,6 @@ export const map = {
   },
   tooltip: {
     outsideRange: "Outside filter range",
+    powerSource: (day: string) => `NASA POWER · ${day}, smoothed`,
   },
 } as const;
