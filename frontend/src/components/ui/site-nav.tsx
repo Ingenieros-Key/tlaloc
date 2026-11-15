@@ -4,8 +4,9 @@ import { Brand } from "./brand";
 import { NavLinks } from "./nav-links";
 import { LangToggle, ThemeToggle } from "./toggles";
 import { AuthControl } from "./auth-control";
+import { MobileMenu } from "./mobile-menu";
 
-/** Marketing header used on the home and about pages. */
+/** Marketing header used on the home and about pages. Collapses to a burger below md. */
 export function SiteNav() {
   return (
     <header className="relative z-40 flex items-center justify-between gap-4 px-6 py-4">
@@ -14,9 +15,12 @@ export function SiteNav() {
         <NavLinks className="max-md:hidden" />
       </div>
       <div className="flex items-center gap-3">
-        <LangToggle />
-        <ThemeToggle />
+        <div className="flex items-center gap-3 max-md:hidden">
+          <LangToggle />
+          <ThemeToggle />
+        </div>
         <AuthControl />
+        <MobileMenu className="md:hidden" />
       </div>
     </header>
   );

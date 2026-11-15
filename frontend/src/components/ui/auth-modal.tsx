@@ -31,48 +31,18 @@ const CloseIcon = () => (
   </svg>
 );
 
-function RainPanel({ tagline }: { tagline: string }) {
-  const reduce = useReducedMotion();
-  const drops = Array.from({ length: 22 }, (_, i) => i);
+function BrandPanel({ tagline }: { tagline: string }) {
   return (
-    <div className="relative hidden w-2/5 shrink-0 overflow-hidden bg-gradient-to-b from-[#0B1033] via-[#122152] to-[#1FC8B4]/40 md:block">
-      {!reduce &&
-        drops.map((i) => {
-          const left = (i * 37) % 100;
-          const delay = (i % 7) * 0.33;
-          const dur = 1 + (i % 5) * 0.25;
-          return (
-            <motion.span
-              key={i}
-              className="absolute top-[-10%] h-10 w-px bg-white/30"
-              style={{ left: `${left}%` }}
-              initial={{ y: "-10%", opacity: 0 }}
-              animate={{ y: "120%", opacity: [0, 0.8, 0] }}
-              transition={{ duration: dur, delay, repeat: Infinity, ease: "linear" }}
-            />
-          );
-        })}
-      <div className="relative z-10 flex h-full flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="relative flex items-center justify-center">
-          <div
-            aria-hidden
-            className="absolute -z-10 h-56 w-56 rounded-full"
-            style={{
-              background:
-                "radial-gradient(circle, rgba(31,200,180,0.40), rgba(246,185,59,0.14) 45%, transparent 72%)",
-              filter: "blur(10px)",
-            }}
-          />
-          <motion.img
-            src="/tlaloc-mascot.png"
-            alt="Tlaloc"
-            className="h-48 w-48 drop-shadow-2xl"
-            initial={{ scale: 0.8, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 180, damping: 16 }}
-          />
-        </div>
-        <p className="max-w-[16rem] text-sm font-medium text-[#F4F0E6]/90">{tagline}</p>
+    <div className="relative hidden w-2/5 shrink-0 overflow-hidden bg-[#0B1033] md:block">
+      <img
+        src="/tlaloc-crop-cycle-loop.gif"
+        alt=""
+        aria-hidden
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0B1033] via-[#0B1033]/40 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 z-10 p-8 text-center">
+        <p className="text-sm font-medium text-[#F4F0E6]/90">{tagline}</p>
       </div>
     </div>
   );
@@ -169,7 +139,7 @@ export function AuthModal({
             exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 10 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
           >
-            <RainPanel tagline={t.tagline} />
+            <BrandPanel tagline={t.tagline} />
 
             <div className="relative flex-1 overflow-y-auto p-7">
               <button
