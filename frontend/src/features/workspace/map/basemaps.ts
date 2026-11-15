@@ -1,11 +1,18 @@
 import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import { t } from "../strings";
+import type { Theme } from "@/lib/theme";
 import type { Basemap } from "../types";
 import { BG_HEX } from "./theme";
 import { TD_PREFIX } from "./terraDraw";
 
-/** OpenFreeMap dark vector style (OpenMapTiles schema; attribution comes from its TileJSON). */
-const DARK_STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
+/**
+ * OpenFreeMap vector styles (OpenMapTiles schema; attribution comes from their TileJSON). Dark and
+ * Positron share the same layout, so switching themes keeps labels and the overlay anchor.
+ */
+const STREET_STYLE_URL: Readonly<Record<Theme, string>> = {
+  dark: "https://tiles.openfreemap.org/styles/dark",
+  light: "https://tiles.openfreemap.org/styles/positron",
+};
 
 /**
  * NASA GIBS Blue Marble: Next Generation, a cloud-free monthly composite. Its TileMatrixSet is
@@ -43,9 +50,17 @@ export const FALLBACK_STYLE: StyleSpecification = {
   layers: [{ id: "background", type: "background", paint: { "background-color": BG_HEX } }],
 };
 
-/** The MapLibre style for a basemap choice. */
-export function basemapStyle(basemap: Basemap): StyleSpecification | string {
-  return basemap === "satellite" ? SATELLITE_STYLE : DARK_STYLE_URL;
+/** The MapLibre style for a basemap choice. Satellite imagery is the same in both themes. */
+export function basemapStyle(basemap: Basemap, theme: Theme): StyleSpecification | string {
+  return basemap === "satellite" ? SATELLITE_STYLE : STREET_STYLE_URL[theme];
+}
+
+/** Whether moving between these two theme/basemap combinations needs a new MapLibre style. */
+export function needsStyleSwap(
+  from: { readonly basemap: Basemap; readonly theme: Theme },
+  to: { readonly basemap: Basemap; readonly theme: Theme },
+): boolean {
+  return basemapStyle(from.basemap, from.theme) !== basemapStyle(to.basemap, to.theme);
 }
 
 /**

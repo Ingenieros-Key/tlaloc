@@ -3,7 +3,7 @@
 import { Info, MapPinOff, SquareDashed } from "lucide-react";
 import type { ReactNode } from "react";
 import { focusMapCanvas } from "../map/focus";
-import { useWorkspace, useWorkspaceDispatch } from "../store";
+import { usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
@@ -13,9 +13,15 @@ import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
 /** Right "Inspector" panel: plot facts and the per-crop planting outlook for the drawn square. */
 export function InspectorPanel() {
   const { plotSummary, analysis } = useWorkspace();
+  const collapse = usePanelCollapse("inspector", t.inspector.title);
 
   return (
-    <Panel title={t.inspector.title} labelledBy="inspector-title" className="h-full">
+    <Panel
+      title={t.inspector.title}
+      labelledBy="inspector-title"
+      collapse={collapse}
+      className="h-full"
+    >
       <div className="flex min-h-full flex-col">
         <div className="flex-1 divide-y divide-line">
           <Section id="inspector-plot" heading={t.inspector.plotHeading}>
