@@ -68,6 +68,12 @@ export function plotBounds(plot: PlotFeature): LngLatBoundsLike {
 export const PITCH_3D = 30;
 export const MAX_PITCH = 60;
 export const PLOT_MAX_ZOOM = 15;
+/** "Go to coordinates" zooms in to at least this level (roads and towns readable). */
+export const GOTO_MIN_ZOOM = 12;
+/** "Go to" flight: pulls out to this zoom (the whole globe) over the point, then dives in. */
+export const GOTO_PEAK_ZOOM = 1.5;
+export const GOTO_OUT_MS = 1800;
+export const GOTO_IN_MS = 3200;
 
 /**
  * Opening shot: the whole globe, turned to show the Americas, before the camera flies to El

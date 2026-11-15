@@ -18,7 +18,7 @@ import { RangeSlider } from "./RangeSlider";
  * controls.
  */
 export function LayerRow({ id }: { readonly id: LayerId }) {
-  const { activeLayer, layerSettings } = useWorkspace();
+  const { activeLayer, layerSettings, display } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -67,37 +67,48 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
           {t.browser.rowHint}
         </span>
       </div>
+      {/*
+        Slides open by animating grid rows 0fr → 1fr (no height measuring). Collapsed details turn
+        invisible after the slide, so they leave the tab order without cutting the animation.
+      */}
       <div
         id={detailsId}
-        hidden={!active}
-        className="space-y-3 border-b border-line bg-surface-2 px-3 pb-3 pt-2"
+        className={`grid ${
+          active
+            ? "grid-rows-[1fr] [transition:grid-template-rows_250ms_cubic-bezier(0.2,0,0,1)]"
+            : "invisible grid-rows-[0fr] [transition:grid-template-rows_250ms_cubic-bezier(0.2,0,0,1),visibility_0s_250ms]"
+        }`}
       >
-        <Legend layer={layer} range={settings.range} />
-        <OpacitySlider
-          opacity={settings.opacity}
-          onChange={(opacity) => dispatch({ type: "setLayerOpacity", layer: id, opacity })}
-        />
-        <RangeSlider
-          layer={layer}
-          range={settings.range}
-          onChange={(range) => dispatch({ type: "setLayerRange", layer: id, range })}
-        />
-        {customized ? (
-          <div className="flex justify-end">
-            <button
-              type="button"
-              aria-label={t.browser.resetLayer(name)}
-              onClick={() => {
-                dispatch({ type: "resetLayer", layer: id });
-                triggerRef.current?.focus();
-              }}
-              className="inline-flex h-9 max-lg:h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/10"
-            >
-              <RotateCcw aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
-              {t.browser.reset}
-            </button>
+        <div className="min-h-0 overflow-hidden">
+          <div className="space-y-3 border-b border-line bg-surface-2 px-3 pb-3 pt-2">
+            {display.legends ? <Legend layer={layer} range={settings.range} /> : null}
+            <OpacitySlider
+              opacity={settings.opacity}
+              onChange={(opacity) => dispatch({ type: "setLayerOpacity", layer: id, opacity })}
+            />
+            <RangeSlider
+              layer={layer}
+              range={settings.range}
+              onChange={(range) => dispatch({ type: "setLayerRange", layer: id, range })}
+            />
+            {customized ? (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  aria-label={t.browser.resetLayer(name)}
+                  onClick={() => {
+                    dispatch({ type: "resetLayer", layer: id });
+                    triggerRef.current?.focus();
+                  }}
+                  className="inline-flex h-9 max-lg:h-11 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/10"
+                >
+                  <RotateCcw aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
+                  {t.browser.reset}
+                </button>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
     </li>
   );

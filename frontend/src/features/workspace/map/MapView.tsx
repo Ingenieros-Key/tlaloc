@@ -7,8 +7,10 @@ import { CloudOff, LoaderCircle, X } from "lucide-react";
 import {
   AttributionControl,
   Map as MapLibreMap,
+  Marker,
   setWorkerUrl,
   type ErrorEvent as MapErrorEvent,
+  type MapMouseEvent,
 } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TerraDraw } from "terra-draw";
@@ -20,11 +22,21 @@ import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import type { Basemap, GridCell, LayerId, LayerSettings, MapController, ViewState } from "../types";
 import { IconButton } from "../ui/IconButton";
-import { FALLBACK_STYLE, basemapStyle, findOverlayAnchor, needsStyleSwap } from "./basemaps";
+import {
+  FALLBACK_STYLE,
+  basemapStyle,
+  findOverlayAnchor,
+  needsStyleSwap,
+  setBasemapLabels,
+} from "./basemaps";
 import { DATA_LAYER_ID, buildDeckLayers, deckGroupId } from "./deckLayers";
 import { MAP_CONTAINER_ID } from "./focus";
 import {
   COUNTRY_BOUNDS,
+  GOTO_IN_MS,
+  GOTO_MIN_ZOOM,
+  GOTO_OUT_MS,
+  GOTO_PEAK_ZOOM,
   INTRO_CENTER,
   INTRO_FLIGHT_MS,
   INTRO_HOLD_MS,
@@ -99,7 +111,7 @@ export function MapView() {
   const state = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const { register } = useMapController();
-  const { activeLayer, layerSettings, basemap, is3d, tool, plot } = state;
+  const { activeLayer, layerSettings, basemap, is3d, tool, plot, pin, picking, display } = state;
   const theme = useAppTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -114,21 +126,25 @@ export function MapView() {
   const themeRef = useRef<Theme>(theme);
   const styleLoadedRef = useRef(false);
   const fallbackRef = useRef(false);
-  /** True while the opening globe flight runs; deck layers stay hidden until it ends. */
-  const introRef = useRef(false);
+  const markerRef = useRef<Marker | null>(null);
+  /**
+   * True during a globe flight (the opening intro or a "Go to" jump): the map uses the globe
+   * projection and deck layers stay hidden until it lands.
+   */
+  const globeRef = useRef(false);
 
   const [beforeId, setBeforeId] = useState<string | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
   const [readyBasemap, setReadyBasemap] = useState<Basemap>(basemap);
   const [notice, setNotice] = useState<NoticeKind | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
-  const [introActive, setIntroActive] = useState(false);
+  const [globeActive, setGlobeActive] = useState(false);
 
   const cells = useMemo(() => getSampleGrid(), []);
   // deck.gl's interleaved polygons tear on the globe, so the data waits for the flat map.
   const layers = useMemo(
-    () => (introActive ? [] : buildDeckLayers({ cells, activeLayer, layerSettings, beforeId })),
-    [introActive, cells, activeLayer, layerSettings, beforeId],
+    () => (globeActive ? [] : buildDeckLayers({ cells, activeLayer, layerSettings, beforeId, display })),
+    [globeActive, cells, activeLayer, layerSettings, beforeId, display],
   );
 
   useEffect(() => {
@@ -145,8 +161,8 @@ export function MapView() {
 
     // Intro: open on the globe and fly in on load. Reduced motion opens on the country directly.
     const intro = motionMs(INTRO_FLIGHT_MS) > 0;
-    introRef.current = intro;
-    if (intro) queueMicrotask(() => setIntroActive(true));
+    globeRef.current = intro;
+    if (intro) queueMicrotask(() => setGlobeActive(true));
     const camera = intro
       ? { center: INTRO_CENTER, zoom: INTRO_ZOOM, pitch: 0 }
       : {
@@ -178,14 +194,38 @@ export function MapView() {
     let moveFrame = 0;
 
     const currentLayers = () => {
-      if (introRef.current) return [];
+      if (globeRef.current) return [];
       const s = stateRef.current;
       return buildDeckLayers({
         cells,
         activeLayer: s.activeLayer,
         layerSettings: s.layerSettings,
         beforeId: beforeIdRef.current,
+        display: s.display,
       });
+    };
+
+    // Globe flights. The intro starts in globe mode (set above); "Go to" enters it on demand.
+    let introTimer = 0;
+    /** Bumped per "Go to" so a superseded flight's second leg never starts. */
+    let flightId = 0;
+    /** Drops the intro's pre-flight beat, e.g. when "Go to" takes over the camera first. */
+    const cancelIntroHold = () => {
+      window.clearTimeout(introTimer);
+      map.off("movestart", onIntroMoveStart);
+    };
+    /** Globe projection, plus an atmosphere glow that fades out by country zoom. */
+    const applyGlobe = () => {
+      map.setProjection({ type: "globe" });
+      map.setSky({ "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 1, 7, 0] });
+    };
+    /** deck.gl's interleaved polygons tear on the globe, so data layers hide until landing. */
+    const enterGlobe = () => {
+      if (globeRef.current) return;
+      globeRef.current = true;
+      setGlobeActive(true);
+      applyGlobe();
+      overlayRef.current?.setProps({ layers: [] });
     };
 
     const syncPlotFromDraw = (id: string | number) => {
@@ -224,12 +264,10 @@ export function MapView() {
       styleLoadedRef.current = true;
       if (!fallbackRef.current) setNotice(null);
 
-      // The globe is only for the intro flight; setStyle resets projection and sky, so a style
-      // swap mid-flight reapplies them and one afterwards falls back to the flat map.
-      if (introRef.current) {
-        map.setProjection({ type: "globe" });
-        map.setSky({ "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 1, 7, 0] });
-      }
+      // The globe is only for flights; setStyle resets projection and sky, so a style swap
+      // mid-flight reapplies them and one afterwards falls back to the flat map.
+      if (globeRef.current) applyGlobe();
+      if (!stateRef.current.display.labels) setBasemapLabels(map, false);
 
       if (drawRef.current) stopTerraDraw(drawRef.current);
       const draw = createTerraDraw(map);
@@ -261,7 +299,7 @@ export function MapView() {
 
     const onIdle = () => {
       const overlay = overlayRef.current;
-      if (!overlay || !styleLoadedRef.current || introRef.current) return;
+      if (!overlay || !styleLoadedRef.current || globeRef.current) return;
       if (map.getLayer(deckGroupId(beforeIdRef.current))) {
         setReadyBasemap(appliedBasemapRef.current);
         return;
@@ -323,6 +361,39 @@ export function MapView() {
         const current = stateRef.current.plot;
         if (current) fitPlot(plotBounds(current));
       },
+      goTo: ([lng, lat]) => {
+        const target = {
+          center: [lng, lat] as [number, number],
+          zoom: Math.max(map.getZoom(), GOTO_MIN_ZOOM),
+          bearing: 0,
+          pitch: stateRef.current.is3d ? PITCH_3D : 0,
+          padding: cameraPadding(container),
+        };
+        if (motionMs(1) === 0) {
+          map.jumpTo(target);
+          return;
+        }
+        // Like the intro, in two legs: pull out to the globe over the point, then dive onto it.
+        // (flyTo's minZoom peak is ignored under the globe projection, so the legs are explicit.)
+        const id = ++flightId;
+        cancelIntroHold();
+        map.off("moveend", endGlobe);
+        enterGlobe();
+        map.easeTo({
+          center: target.center,
+          zoom: Math.min(map.getZoom(), GOTO_PEAK_ZOOM),
+          bearing: 0,
+          pitch: 0,
+          padding: target.padding,
+          duration: GOTO_OUT_MS,
+        });
+        // Registered after easeTo: starting it stops any running flight, which fires moveend.
+        map.once("moveend", () => {
+          if (id !== flightId) return; // A newer "Go to" took over.
+          map.flyTo({ ...target, duration: GOTO_IN_MS });
+          map.once("moveend", endGlobe);
+        });
+      },
     };
     register(controller);
 
@@ -346,25 +417,24 @@ export function MapView() {
       placePlotAtCenter();
     };
 
-    let introTimer = 0;
-    /** Lands the intro: flat map, data layers on. Runs once, when the flight ends or is interrupted. */
-    const endIntro = () => {
-      if (!introRef.current) return;
-      introRef.current = false;
-      window.clearTimeout(introTimer);
-      map.off("movestart", onIntroMoveStart);
+    /** Lands a globe flight: flat map, data layers on. Runs when the flight ends or is interrupted. */
+    const endGlobe = () => {
+      if (!globeRef.current) return;
+      globeRef.current = false;
+      cancelIntroHold();
+      map.off("moveend", endGlobe);
       map.setProjection({ type: "mercator" });
-      setIntroActive(false);
+      setGlobeActive(false);
       overlayRef.current?.setProps({ layers: currentLayers() });
     };
-    const startFlight = () => {
+    const startIntroFlight = () => {
       map.off("movestart", onIntroMoveStart);
       fitCountry(INTRO_FLIGHT_MS);
-      map.once("moveend", endIntro);
+      map.once("moveend", endGlobe);
     };
-    /** The user grabbed the globe before the flight began: skip it and hand over the camera. */
+    /** The user grabbed the globe before the intro flight began: skip it and hand over the camera. */
     const onIntroMoveStart = (e: { originalEvent?: unknown }) => {
-      if (e.originalEvent) endIntro();
+      if (e.originalEvent) endGlobe();
     };
 
     const onLoad = () => {
@@ -376,7 +446,7 @@ export function MapView() {
       // also fires moveend and lands the intro where the user stopped it.
       if (intro) {
         map.on("movestart", onIntroMoveStart);
-        introTimer = window.setTimeout(startFlight, INTRO_HOLD_MS);
+        introTimer = window.setTimeout(startIntroFlight, INTRO_HOLD_MS);
       }
     };
 
@@ -395,7 +465,7 @@ export function MapView() {
       window.clearTimeout(loadTimer);
       window.clearTimeout(introTimer);
       map.off("movestart", onIntroMoveStart);
-      map.off("moveend", endIntro);
+      map.off("moveend", endGlobe);
       if (moveFrame) cancelAnimationFrame(moveFrame);
       register(null);
       container.removeEventListener("keydown", onKeyDown);
@@ -416,6 +486,8 @@ export function MapView() {
           // The style is mid-swap; map.remove() below releases the deck instance regardless.
         }
       }
+      markerRef.current?.remove();
+      markerRef.current = null;
       mapRef.current = null;
       map.remove();
     };
@@ -466,17 +538,68 @@ export function MapView() {
     beforeIdRef.current = undefined;
     const s = stateRef.current;
     overlayRef.current?.setProps({
-      layers: introRef.current
+      layers: globeRef.current
         ? []
         : buildDeckLayers({
             cells,
             activeLayer: s.activeLayer,
             layerSettings: s.layerSettings,
             beforeId: undefined,
+            display: s.display,
           }),
     });
     map.setStyle(basemapStyle(basemap, theme), { diff: false });
   }, [basemap, theme, cells]);
+
+  // "Go to" pin: a draggable DOM marker, so it survives basemap/theme style swaps untouched.
+  // Dragging it updates the pin (and so the Go to fields); the camera stays put.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!pin || !display.pin) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    let marker = markerRef.current;
+    if (!marker) {
+      const created = new Marker({ element: createPinElement(), anchor: "bottom", draggable: true });
+      created.on("dragend", () => {
+        const { lng, lat } = created.getLngLat();
+        dispatch({ type: "setPin", pin: [lng, lat] });
+      });
+      created.setLngLat([pin[0], pin[1]]).addTo(map);
+      markerRef.current = created;
+      marker = created;
+    }
+    marker.setLngLat([pin[0], pin[1]]);
+  }, [pin, display.pin, loaded, dispatch]);
+
+  // Display card: basemap labels. Also reapplied on every style load (see onStyleLoad).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleLoadedRef.current) return;
+    setBasemapLabels(map, display.labels);
+  }, [display.labels, loaded]);
+
+  // "Pick on map": crosshair cursor; the next click drops the pin there and centres the map on it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !picking) return;
+    const canvas = map.getCanvas();
+    canvas.style.cursor = "crosshair";
+    const onClick = (e: MapMouseEvent) => {
+      const { lng, lat } = e.lngLat;
+      dispatch({ type: "setPin", pin: [lng, lat] });
+      dispatch({ type: "setPicking", picking: false });
+      map.easeTo({ center: [lng, lat], duration: motionMs(500) });
+    };
+    map.on("click", onClick);
+    return () => {
+      map.off("click", onClick);
+      canvas.style.cursor = "";
+    };
+  }, [picking, dispatch]);
 
   useEffect(() => {
     const draw = drawRef.current;
@@ -503,7 +626,7 @@ export function MapView() {
   return (
     <div role="region" aria-label={t.map.regionLabel} className="absolute inset-0 bg-bg">
       <div id={MAP_CONTAINER_ID} ref={containerRef} className="h-full w-full" />
-      {hover && activeLayer ? (
+      {hover && activeLayer && display.tooltips ? (
         <CellTooltip hover={hover} layer={activeLayer} settings={layerSettings[activeLayer]} />
       ) : null}
       {spinning ? <LoadingIndicator label={t.map.loading} /> : null}
@@ -578,4 +701,27 @@ function LoadNotice({ kind, onDismiss }: { readonly kind: NoticeKind; readonly o
       <IconButton icon={X} label={t.map.dismissError} size="sm" onClick={onDismiss} />
     </div>
   );
+}
+
+/**
+ * "Go to" map pin: a teardrop with an elote (corn cob in its husk) inside; the tip sits on the
+ * coordinate. Colors come from the theme tokens so it reads on both basemaps. Draggable with a
+ * pointer; keyboard users set it through the Go to form, so it stays out of the accessibility tree.
+ */
+function createPinElement(): HTMLElement {
+  const el = document.createElement("div");
+  el.setAttribute("aria-hidden", "true");
+  el.className = "cursor-grab drop-shadow-[0_2px_3px_rgb(0_0_0/0.45)] active:cursor-grabbing";
+  el.innerHTML = `<svg width="34" height="42" viewBox="0 0 34 42" xmlns="http://www.w3.org/2000/svg">
+  <path d="M17 40.5C17 40.5 3.5 25.5 3.5 16a13.5 13.5 0 1 1 27 0c0 9.5-13.5 24.5-13.5 24.5Z"
+    fill="var(--tl-surface)" stroke="var(--tl-accent)" stroke-width="2.25" stroke-linejoin="round"/>
+  <ellipse cx="17" cy="14.5" rx="4.4" ry="7.6" fill="#f6b93b"/>
+  <g stroke="#b9780c" stroke-width="0.7" stroke-linecap="round" opacity="0.55">
+    <path d="M17 7.4v14.2M14.6 9.2v10.6M19.4 9.2v10.6"/>
+    <path d="M13 11.2h8M12.7 14.5h8.6M13 17.8h8"/>
+  </g>
+  <path d="M17 25c-4.6-1.6-6.9-6.2-6.6-12.2 1.9 3.2 4 7 6.6 12.2Z" fill="var(--tl-good)"/>
+  <path d="M17 25c4.6-1.6 6.9-6.2 6.6-12.2-1.9 3.2-4 7-6.6 12.2Z" fill="var(--tl-good)"/>
+</svg>`;
+  return el;
 }

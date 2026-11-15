@@ -14,6 +14,11 @@ export type PanelCollapse = {
  *
  * With `collapse`, lg+ shows a header toggle that folds the panel down to its header. Below lg the
  * panel is a drawer that closes entirely, so the toggle is hidden and `collapsed` is ignored.
+ *
+ * The parent must be a full-height flex column. The panel grows into it with `flex: 1 1 0` and folds
+ * by animating flex-grow to 0, which slides its height down to the header (min-height) without
+ * measuring content. The folded body turns invisible only after the slide, so it leaves the tab
+ * order and accessibility tree without cutting the animation short.
  */
 export function Panel({
   title,
@@ -34,7 +39,9 @@ export function Panel({
   return (
     <section
       aria-labelledby={labelledBy}
-      className={`flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-surface/95 shadow-xl shadow-black/40 backdrop-blur ${className}`}
+      className={`pointer-events-auto flex min-h-[42px] flex-[1_1_0%] flex-col overflow-hidden rounded-lg border border-line bg-surface/95 shadow-xl shadow-black/40 backdrop-blur transition-[flex-grow] duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
+        collapsed ? "lg:grow-0" : ""
+      } ${className}`}
     >
       <header
         className={`flex h-10 shrink-0 items-center justify-between gap-2 border-b border-line pl-3 pr-1 ${
@@ -67,7 +74,10 @@ export function Panel({
           </button>
         ) : null}
       </header>
-      <div id={bodyId} className={`min-h-0 flex-1 overflow-y-auto ${collapsed ? "lg:hidden" : ""}`}>
+      <div
+        id={bodyId}
+        className={`min-h-0 flex-1 overflow-y-auto ${collapsed ? "lg:invisible lg:[transition:visibility_0s_300ms]" : ""}`}
+      >
         {children}
       </div>
     </section>

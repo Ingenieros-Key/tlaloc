@@ -37,7 +37,7 @@ export function Workspace() {
  * inert to keep keyboard focus out of content that cannot be seen.
  */
 function Canvas() {
-  const { panels } = useWorkspace();
+  const { panels, display } = useWorkspace();
   const drawerLayout = useMediaQuery(DRAWER_QUERY);
   const covered = drawerLayout && (panels.browser || panels.inspector);
 
@@ -53,14 +53,14 @@ function Canvas() {
         className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center px-4"
       >
         <PlotUndoToast />
-        <NavBar />
+        {display.navBar ? <NavBar /> : null}
       </div>
     </main>
   );
 }
 
 function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
-  const { panels, collapsed } = useWorkspace();
+  const { panels } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const anyOpen = panels.browser || panels.inspector;
 
@@ -93,7 +93,6 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
         side="left"
         panel="browser"
         open={panels.browser}
-        collapsed={collapsed.browser}
         drawerLayout={drawerLayout}
       >
         <BrowserPanel />
@@ -102,7 +101,6 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
         side="right"
         panel="inspector"
         open={panels.inspector}
-        collapsed={collapsed.inspector}
         drawerLayout={drawerLayout}
       >
         <InspectorPanel />
@@ -115,21 +113,19 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
  * lg+: panel floats over the map at a fixed width. Below lg: off-canvas drawer toggled from the
  * top bar, closed with Escape or the scrim. Opening a drawer moves focus to its heading; closing it
  * returns focus to its top-bar toggle unless an in-panel action already moved focus elsewhere.
- * A collapsed panel (lg+) keeps its top edge and drops its bottom anchor so it hugs the header.
+ * The dock always spans the full height and lets clicks through; the panel inside grows into it
+ * and slides down to its header when collapsed (see `Panel`), so the map stays usable below it.
  */
 function Dock({
   side,
   panel,
   open,
-  collapsed,
   drawerLayout,
   children,
 }: {
   readonly side: "left" | "right";
   readonly panel: PanelId;
   readonly open: boolean;
-  /** lg+ only: the panel is folded to its header, so the dock shrinks to fit it. */
-  readonly collapsed: boolean;
   readonly drawerLayout: boolean;
   readonly children: ReactNode;
 }) {
@@ -160,7 +156,7 @@ function Dock({
     <div
       ref={ref}
       id={`dock-${panel}`}
-      className={`absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:top-3 ${collapsed ? "lg:bottom-auto" : "lg:bottom-3"} ${width} ${position} ${
+      className={`pointer-events-none absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:bottom-3 lg:top-3 ${width} ${position} ${
         open ? "max-lg:translate-x-0" : `${hidden} max-lg:invisible`
       }`}
     >
