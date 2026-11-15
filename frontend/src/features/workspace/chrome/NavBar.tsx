@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartNoAxesColumn, House, Minus, Navigation2, Plus } from "lucide-react";
+import { ChartNoAxesColumn, House, Layers, Minus, Navigation2, Plus } from "lucide-react";
 import { t } from "../strings";
 import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
 import { IconButton } from "../ui/IconButton";
@@ -10,15 +10,17 @@ const s = t.chrome.nav;
 
 /**
  * Fusion-style bottom navigation bar: zoom, reset north (live compass), home, go to coordinates, the
- * timeline's show/hide toggle and zoom readout. `relative` anchors the coordinates popover above
+ * data layer's and the timeline's show/hide toggles and zoom readout. `relative` anchors the coordinates popover above
  * the bar.
  */
 export function NavBar() {
-  const { view, display, layerData } = useWorkspace();
+  const { view, display, timelineData, activeLayer, viewMode } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const controller = useMapController();
-  // The timeline only exists while a layer's days are loaded (never in the Crop score view).
-  const hasTimeline = layerData.status === "ready";
+  // The timeline only exists while a layer's days are loaded (never for elevation alone or the Crop score).
+  const hasTimeline = timelineData.status === "ready" && timelineData.frames.dates.length > 0;
+  // Something to hide: a layer is on, or the Crop score view (which draws without one).
+  const hasData = activeLayer !== null || viewMode === "score";
 
   return (
     <div
@@ -46,6 +48,13 @@ export function NavBar() {
       <IconButton icon={House} label={s.home} onClick={() => controller.get()?.resetView()} />
       <GoToCoordinates />
       <Divider />
+      <IconButton
+        icon={Layers}
+        label={hasData ? s.dataLayer : s.dataLayerUnavailable}
+        pressed={hasData && display.data}
+        disabled={!hasData}
+        onClick={() => dispatch({ type: "setDisplay", key: "data", visible: !display.data })}
+      />
       <IconButton
         icon={ChartNoAxesColumn}
         label={hasTimeline ? s.timeline : s.timelineUnavailable}

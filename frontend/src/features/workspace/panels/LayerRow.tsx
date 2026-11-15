@@ -2,7 +2,7 @@
 
 import { ChevronDown, Eye, EyeOff, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
-import { LAYERS, isLiveLayer } from "../layers";
+import { LAYERS, isLiveLayer, isPowerLayer } from "../layers";
 import { useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import type { DataStyle, LayerId } from "../types";
@@ -64,7 +64,7 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
             <span className="flex items-center gap-1.5">
               <span className="truncate text-[13px] font-medium text-text">{name}</span>
               {live ? (
-                <span title={t.browser.precip.badgeHint}>
+                <span title={id === "elevation" ? t.browser.elevationBadgeHint : t.browser.precip.badgeHint}>
                   <Badge tone="accent" className="px-1 py-0 text-[10px] tracking-wide">
                     {t.browser.precip.badge}
                   </Badge>
@@ -99,16 +99,16 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
           <div className="space-y-3 border-b border-line bg-surface-2 px-3 pb-3 pt-2">
             {live && layerData.status === "loading" ? (
               <p role="status" className="text-xs text-muted">
-                {t.browser.precip.loading}
+                {id === "elevation" ? t.browser.elevationLoading : t.browser.precip.loading}
               </p>
             ) : null}
             {live && layerData.status === "error" ? (
               <div role="alert" className="flex items-start justify-between gap-2 text-xs">
-                <p className="text-poor">{t.browser.precip.error}</p>
+                <p className="text-poor">{id === "elevation" ? t.browser.elevationError : t.browser.precip.error}</p>
                 <RetryButton onClick={layerData.retry} />
               </div>
             ) : null}
-            {live ? <PrecipTimeline /> : null}
+            {isPowerLayer(id) ? <PrecipTimeline /> : null}
             <Segmented<DataStyle>
               label={t.browser.style}
               showLabel

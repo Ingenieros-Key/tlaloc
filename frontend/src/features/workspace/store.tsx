@@ -32,8 +32,9 @@ import {
   type PrecipWindow,
 } from "./data/precip";
 import { getSampleGrid } from "./data/sample-grid";
+import { elevationQuery } from "./data/elevation";
 import { buildScoreField, type ScoreField } from "./data/score";
-import { LAYER_ORDER, defaultLayerSettings, isTwoLayerMode } from "./layers";
+import { LAYER_ORDER, defaultLayerSettings, isPowerLayer, isTwoLayerMode } from "./layers";
 import { t } from "./strings";
 import type {
   AnalysisState,
@@ -47,6 +48,7 @@ import type {
   LayerId,
   LayerSettings,
   MapController,
+  PowerLayerId,
   PlotFeature,
   PlotSummary,
   Tool,
@@ -109,6 +111,13 @@ export type WorkspaceState = {
   readonly secondLayer: LayerId;
   /** Daily frames of `secondLayer`, loaded only in a two-layer view. */
   readonly layerDataB: PrecipState;
+  /**
+   * The layer whose days the timeline scrubs and plays: the active layer, or in a two-layer view
+   * with elevation (which has no days) as the active one, the second layer. Null = no timeline.
+   */
+  readonly timelineLayer: PowerLayerId | null;
+  /** `timelineLayer`'s frames: `layerData` or `layerDataB`. */
+  readonly timelineData: PrecipState;
   /** The crop the Crop score view scores. */
   readonly scoreCrop: CropId;
   /** The Crop score view's values, loaded only in that view. */
@@ -169,7 +178,10 @@ export type WorkspaceState = {
 };
 
 /** What the reducer owns: everything except state derived from queries. */
-type ReducerState = Omit<WorkspaceState, "layerData" | "layerDataB" | "scoreData" | "plotRain">;
+type ReducerState = Omit<
+  WorkspaceState,
+  "layerData" | "layerDataB" | "timelineLayer" | "timelineData" | "scoreData" | "plotRain"
+>;
 
 export type WorkspaceAction =
   | { readonly type: "setTool"; readonly tool: Tool }
@@ -223,7 +235,7 @@ export type WorkspaceAction =
   | { readonly type: "setDisplay"; readonly key: DisplayKey; readonly visible: boolean }
   | { readonly type: "resetDisplay" };
 
-/** Everything visible: the workspace as first designed. */
+/** The workspace as it opens: everything visible except the timeline. */
 export const DEFAULT_DISPLAY: DisplaySettings = {
   data: true,
   borders: true,
@@ -232,7 +244,8 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   tooltips: true,
   pin: true,
   plotLabel: true,
-  timeline: true,
+  // Closed at start: the nav bar's Timeline button opens it, and so does picking a timeframe.
+  timeline: false,
   navBar: true,
   legends: true,
   limiting: true,
@@ -270,7 +283,8 @@ export const INITIAL_STATE: ReducerState = {
   analysisNonce: 0,
   view: { bearing: 0, pitch: 30, zoom: 8 },
   panels: { browser: false, inspector: false },
-  collapsed: { browser: false, inspector: false },
+  // The left flyout starts closed (lg and up); the tool rail opens it.
+  collapsed: { browser: true, inspector: false },
   browserSection: "tool",
   pin: null,
   picking: false,
@@ -336,7 +350,13 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
     case "setPrecipSpeed":
       return { ...state, precipSpeed: action.speed };
     case "setPrecipMode":
-      return { ...state, precipMode: action.mode, precipPlaying: false };
+      // A timeframe is scrubbed and played in the timeline, so choosing one opens it.
+      return {
+        ...state,
+        precipMode: action.mode,
+        precipPlaying: false,
+        display: action.mode === "range" ? { ...state.display, timeline: true } : state.display,
+      };
     case "setPrecipRange":
       // A new timeframe opens on its last day.
       return { ...state, precipRange: action.range, precipDay: null, precipPlaying: false };
@@ -521,8 +541,8 @@ export function lastDay(precip: PrecipState): number {
 }
 
 /** Frame to draw: the newest day in "latest" mode, else the chosen day of the timeframe. */
-export function precipDayIndex(state: Pick<WorkspaceState, "layerData" | "precipDay" | "precipMode">): number {
-  const last = lastDay(state.layerData);
+export function precipDayIndex(state: Pick<WorkspaceState, "timelineData" | "precipDay" | "precipMode">): number {
+  const last = lastDay(state.timelineData);
   if (state.precipMode === "latest") return last;
   return Math.min(last, Math.max(0, state.precipDay ?? last));
 }
@@ -599,13 +619,22 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   const layerDataB = useLayerQuery(isTwoLayerMode(state.viewMode) ? state.secondLayer : null, range);
   const scoreData = useScoreData(scoring, state.scoreCrop);
   const plotRain = plotClimate.status === "ready" ? plotClimate.monthlyRain : null;
+  // Elevation has no days: as the active layer of a two-layer view, the timeline follows the other.
+  const { activeLayer, secondLayer, viewMode } = state;
+  const timelineFromB = activeLayer === "elevation" && isTwoLayerMode(viewMode) && isPowerLayer(secondLayer);
+  const timelineLayer = timelineFromB
+    ? (secondLayer as PowerLayerId)
+    : activeLayer && isPowerLayer(activeLayer)
+      ? activeLayer
+      : null;
+  const timelineData = timelineFromB ? layerDataB : layerData;
   const value = useMemo<WorkspaceState>(
-    () => ({ ...state, layerData, layerDataB, scoreData, plotRain }),
-    [state, layerData, layerDataB, scoreData, plotRain],
+    () => ({ ...state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain }),
+    [state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain],
   );
 
   const { precipPlaying, precipSpeed } = state;
-  const last = lastDay(layerData);
+  const last = lastDay(timelineData);
   useEffect(() => {
     if (!precipPlaying) return;
     const timer = window.setInterval(() => dispatch({ type: "stepPrecip", last }), stepMs(last + 1, precipSpeed));
@@ -634,6 +663,28 @@ function keyParameters(key: readonly unknown[]): string {
 }
 
 function useLayerQuery(layer: LayerId | null, range: PrecipWindow | null): PrecipState {
+  const power = usePowerLayerQuery(layer === "elevation" ? null : layer, range);
+  const elevation = useElevationLayer(layer === "elevation");
+  return layer === "elevation" ? elevation : power;
+}
+
+/** Elevation: one static frame from the terrain tiles, loaded the first time it is shown. */
+function useElevationLayer(enabled: boolean): PrecipState {
+  const { data, error, isError, refetch } = useQuery({ ...elevationQuery(), enabled });
+  return useMemo<PrecipState>(() => {
+    if (data) return { status: "ready", frames: data, refreshing: false };
+    if (isError) {
+      return {
+        status: "error",
+        message: error instanceof Error ? error.message : String(error),
+        retry: () => void refetch(),
+      };
+    }
+    return enabled ? { status: "loading" } : { status: "idle" };
+  }, [data, isError, error, refetch, enabled]);
+}
+
+function usePowerLayerQuery(layer: PowerLayerId | null, range: PrecipWindow | null): PrecipState {
   const [latest] = useState(latestWindow);
   const enabled = layer !== null;
   const options = layerRegionalQuery(layer ?? "precip", range ?? latest);

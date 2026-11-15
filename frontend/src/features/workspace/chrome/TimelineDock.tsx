@@ -47,7 +47,9 @@ function roundCoord(value: number): number {
  */
 export function TimelineDock() {
   const state = useWorkspace();
-  const { activeLayer, layerData, precipMode, precipPlaying, precipSpeed, pin, plotSummary } = state;
+  // The timeline's layer: the active one, or the second one when the active one is elevation.
+  const { timelineLayer: activeLayer, timelineData: layerData, precipMode, precipPlaying, precipSpeed, pin, plotSummary } =
+    state;
   const dispatch = useWorkspaceDispatch();
   const [hovered, setHovered] = useState<number | null>(null);
   const sliderId = useId();

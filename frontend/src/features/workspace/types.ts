@@ -3,8 +3,11 @@ import type { Feature, Polygon } from "geojson";
 /** Layers drawn from the simulated sample grid; these feed the crop assessment. */
 export type SampleLayerId = "humidity" | "rain" | "soil";
 
-/** Data layers shown in the Browser and on the map. All live NASA POWER data. */
-export type LayerId = "precip" | "temp" | "humidity" | "moisture";
+/** Daily data layers from NASA POWER. */
+export type PowerLayerId = "precip" | "temp" | "humidity" | "moisture";
+
+/** Data layers shown in the Browser and on the map: the daily POWER layers plus static elevation. */
+export type LayerId = PowerLayerId | "elevation";
 
 /** What the crop outlook scores. Each comes from NASA POWER or, failing that, the sample grid. */
 export type FactorId = "temp" | "humidity" | "rain" | "soil";

@@ -66,6 +66,10 @@ export const browser = {
   rangeReadout: (min: string, max: string, unit: string) => `${min} – ${max} ${unit}`,
   reset: "Reset",
   resetLayer: (layer: string) => `Reset ${layer} opacity and range`,
+  /** Elevation: NASA SRTM heights from the AWS Terrain Tiles; static, so it has no timeline. */
+  elevationBadgeHint: "NASA SRTM elevation, via the AWS Terrain Tiles",
+  elevationLoading: "Loading elevation…",
+  elevationError: "Couldn't load elevation.",
   /** Live NASA POWER layers (precipitation, temperature, humidity, soil moisture) and their timeline. */
   precip: {
     badge: "NASA",
