@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { QueryProvider } from "@/lib/query";
 import { useEffect, useRef, type ReactNode } from "react";
 import { NavBar } from "./chrome/NavBar";
 import { PlotUndoToast } from "./chrome/PlotUndoToast";
@@ -22,13 +23,15 @@ const MapView = dynamic(() => import("./map/MapView").then((m) => m.MapView), {
 /** The Fusion-style workspace: top bar, tool ribbon, map canvas with floating Browser/Inspector. */
 export function Workspace() {
   return (
-    <WorkspaceProvider>
-      <div lang="en" className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
-        <TopBar />
-        <Ribbon />
-        <Canvas />
-      </div>
-    </WorkspaceProvider>
+    <QueryProvider>
+      <WorkspaceProvider>
+        <div lang="en" className="flex h-dvh flex-col overflow-hidden bg-bg text-text">
+          <TopBar />
+          <Ribbon />
+          <Canvas />
+        </div>
+      </WorkspaceProvider>
+    </QueryProvider>
   );
 }
 

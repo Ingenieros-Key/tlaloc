@@ -7,18 +7,30 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
   useRef,
   type Dispatch,
   type ReactNode,
 } from "react";
 import { computeAssessment } from "./data/assessment";
 import { summarizePlot } from "./data/plot";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  DEFAULT_PRESET_DAYS,
+  buildPrecipFrames,
+  latestWindow,
+  precipRegionalQuery,
+  presetRange,
+  type PrecipFrames,
+  type PrecipWindow,
+} from "./data/precip";
 import { getSampleGrid } from "./data/sample-grid";
 import { LAYER_ORDER, defaultLayerSettings } from "./layers";
 import { t } from "./strings";
 import type {
   AnalysisState,
   Basemap,
+  DataStyle,
   DisplayKey,
   DisplaySettings,
   InspectorView,
@@ -33,6 +45,23 @@ import type {
 
 export type PanelId = "browser" | "inspector";
 
+export type PrecipMode = "latest" | "range";
+
+/** Playback speed multipliers offered next to the timeline. */
+export const PRECIP_SPEEDS = [0.5, 1, 2, 4] as const;
+export type PrecipSpeed = (typeof PRECIP_SPEEDS)[number];
+
+/**
+ * NASA POWER daily precipitation frames, derived from a TanStack query (not reducer state). Fetched
+ * the first time the layer is shown, then served from the query cache.
+ */
+export type PrecipState =
+  | { readonly status: "idle" }
+  | { readonly status: "loading" }
+  /** `refreshing`: a new timeframe is loading; `frames` still holds the previous one. */
+  | { readonly status: "ready"; readonly frames: PrecipFrames; readonly refreshing: boolean }
+  | { readonly status: "error"; readonly message: string; readonly retry: () => void };
+
 export type WorkspaceState = {
   readonly tool: Tool;
   readonly basemap: Basemap;
@@ -40,6 +69,21 @@ export type WorkspaceState = {
   /** Exactly one data layer is visible at a time; null = none. */
   readonly activeLayer: LayerId | null;
   readonly layerSettings: Readonly<Record<LayerId, LayerSettings>>;
+  /** Hexagons (exact cell values) or a heatmap (smooth surface). */
+  readonly dataStyle: DataStyle;
+  readonly precip: PrecipState;
+  /** "latest": the newest published day (default). "range": a chosen timeframe to scrub and play. */
+  readonly precipMode: PrecipMode;
+  /** The timeframe used in "range" mode. */
+  readonly precipRange: PrecipWindow;
+  /**
+   * Frame shown in "range" mode, as an index into its dates; null = the last day. Read it through
+   * `precipDayIndex`, which also clamps it and handles "latest".
+   */
+  readonly precipDay: number | null;
+  readonly precipPlaying: boolean;
+  /** Playback speed multiplier (1 = the default pace from `stepMs`). */
+  readonly precipSpeed: PrecipSpeed;
   readonly plot: PlotFeature | null;
   readonly plotSummary: PlotSummary | null;
   readonly analysis: AnalysisState;
@@ -58,6 +102,9 @@ export type WorkspaceState = {
   readonly collapsed: Readonly<Record<PanelId, boolean>>;
 };
 
+/** What the reducer owns: everything except state derived from queries. */
+type ReducerState = Omit<WorkspaceState, "precip">;
+
 export type WorkspaceAction =
   | { readonly type: "setTool"; readonly tool: Tool }
   | { readonly type: "setBasemap"; readonly basemap: Basemap }
@@ -66,6 +113,15 @@ export type WorkspaceAction =
   | { readonly type: "setLayerOpacity"; readonly layer: LayerId; readonly opacity: number }
   | { readonly type: "setLayerRange"; readonly layer: LayerId; readonly range: readonly [number, number] }
   | { readonly type: "resetLayer"; readonly layer: LayerId }
+  /** `day` null = follow the newest day. */
+  | { readonly type: "setPrecipDay"; readonly day: number | null }
+  | { readonly type: "setDataStyle"; readonly style: DataStyle }
+  | { readonly type: "setPrecipMode"; readonly mode: PrecipMode }
+  | { readonly type: "setPrecipRange"; readonly range: PrecipWindow }
+  /** `from` is where playback starts (see `PrecipTimeline`). */
+  | { readonly type: "setPrecipPlaying"; readonly playing: boolean; readonly from?: number }
+  | { readonly type: "stepPrecip"; readonly last: number }
+  | { readonly type: "setPrecipSpeed"; readonly speed: PrecipSpeed }
   | { readonly type: "setPlot"; readonly plot: PlotFeature }
   | { readonly type: "clearPlot" }
   | { readonly type: "runAnalysis" }
@@ -92,15 +148,21 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   limiting: true,
 };
 
-export const INITIAL_STATE: WorkspaceState = {
+export const INITIAL_STATE: ReducerState = {
   tool: "pan",
   basemap: "map",
   is3d: true,
-  activeLayer: "humidity",
+  activeLayer: "precip",
   layerSettings: Object.fromEntries(LAYER_ORDER.map((id) => [id, defaultLayerSettings(id)])) as Record<
     LayerId,
     LayerSettings
   >,
+  dataStyle: "hexagons",
+  precipMode: "latest",
+  precipRange: presetRange(DEFAULT_PRESET_DAYS),
+  precipDay: null,
+  precipPlaying: false,
+  precipSpeed: 1,
   plot: null,
   plotSummary: null,
   analysis: { status: "idle" },
@@ -114,7 +176,7 @@ export const INITIAL_STATE: WorkspaceState = {
   display: DEFAULT_DISPLAY,
 };
 
-export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
+export function workspaceReducer(state: ReducerState, action: WorkspaceAction): ReducerState {
   switch (action.type) {
     case "setTool":
       // Choosing a drawing tool takes the map click away from "Pick on map".
@@ -124,7 +186,32 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "set3d":
       return { ...state, is3d: action.is3d };
     case "setActiveLayer":
-      return { ...state, activeLayer: action.layer };
+      return {
+        ...state,
+        activeLayer: action.layer,
+        precipPlaying: action.layer === "precip" && state.precipPlaying,
+      };
+    case "setPrecipDay":
+      return { ...state, precipDay: action.day, precipPlaying: false };
+    case "setDataStyle":
+      return { ...state, dataStyle: action.style };
+    case "setPrecipSpeed":
+      return { ...state, precipSpeed: action.speed };
+    case "setPrecipMode":
+      return { ...state, precipMode: action.mode, precipPlaying: false };
+    case "setPrecipRange":
+      // A new timeframe opens on its last day.
+      return { ...state, precipRange: action.range, precipDay: null, precipPlaying: false };
+    case "setPrecipPlaying":
+      return action.playing
+        ? { ...state, precipPlaying: true, precipDay: action.from ?? state.precipDay }
+        : { ...state, precipPlaying: false };
+    case "stepPrecip": {
+      const day = Math.min(action.last, (state.precipDay ?? action.last) + 1);
+      const done = day >= action.last;
+      // Landing on the newest day hands back to "follow the newest day".
+      return { ...state, precipDay: done ? null : day, precipPlaying: state.precipPlaying && !done };
+    }
     case "setLayerOpacity":
       return {
         ...state,
@@ -195,6 +282,29 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
   }
 }
 
+/** Index of the newest loaded day (0 until data has loaded). */
+export function lastDay(precip: PrecipState): number {
+  return precip.status === "ready" ? Math.max(0, precip.frames.dates.length - 1) : 0;
+}
+
+/** Frame to draw: the newest day in "latest" mode, else the chosen day of the timeframe. */
+export function precipDayIndex(state: Pick<WorkspaceState, "precip" | "precipDay" | "precipMode">): number {
+  const last = lastDay(state.precip);
+  if (state.precipMode === "latest") return last;
+  return Math.min(last, Math.max(0, state.precipDay ?? last));
+}
+
+/**
+ * How long each day stays on screen while the timeline plays. At 1×: 120 ms for short timeframes,
+ * faster for long ones so 90 days play in about 6 seconds and a whole year in about 13. `speed`
+ * divides that, never below one 60 Hz frame. The map fades between days over this time (see
+ * MapView), so playback reads as continuous motion at any speed.
+ */
+export function stepMs(days: number, speed: number = 1): number {
+  const base = Math.min(120, Math.max(35, 6_000 / Math.max(1, days)));
+  return Math.round(Math.max(16, base / speed));
+}
+
 /** Simulated latency so "Analyze" gives visible feedback even though scoring is synchronous. */
 const ANALYSIS_DELAY_MS = 450;
 
@@ -228,13 +338,55 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
     return () => window.clearTimeout(timer);
   }, [plot, analysisNonce]);
 
+  const precip = usePrecipQuery(
+    state.activeLayer === "precip",
+    state.precipMode === "latest" ? null : state.precipRange,
+  );
+  const value = useMemo<WorkspaceState>(() => ({ ...state, precip }), [state, precip]);
+
+  const { precipPlaying, precipSpeed } = state;
+  const last = lastDay(precip);
+  useEffect(() => {
+    if (!precipPlaying) return;
+    const timer = window.setInterval(() => dispatch({ type: "stepPrecip", last }), stepMs(last + 1, precipSpeed));
+    return () => window.clearInterval(timer);
+  }, [precipPlaying, last, precipSpeed]);
+
   return (
-    <StateContext.Provider value={state}>
+    <StateContext.Provider value={value}>
       <DispatchContext.Provider value={dispatch}>
         <MapControllerContext.Provider value={registry}>{children}</MapControllerContext.Provider>
       </DispatchContext.Provider>
     </StateContext.Provider>
   );
+}
+
+/**
+ * Precipitation frames for a timeframe, or for the newest days when `range` is null ("latest"). The
+ * query starts once the layer is shown and is cached (and persisted) by TanStack Query, so reloads
+ * and revisited timeframes skip the fetch. While a new timeframe loads, the previous one stays up.
+ */
+function usePrecipQuery(enabled: boolean, range: PrecipWindow | null): PrecipState {
+  const [latest] = useState(latestWindow);
+  const { data, error, isError, isPlaceholderData, refetch } = useQuery({
+    ...precipRegionalQuery(range ?? latest),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+  const frames = useMemo(() => (data ? buildPrecipFrames(data.data) : null), [data]);
+  return useMemo<PrecipState>(() => {
+    if (frames && !(isError && isPlaceholderData)) {
+      return { status: "ready", frames, refreshing: isPlaceholderData };
+    }
+    if (isError) {
+      return {
+        status: "error",
+        message: error instanceof Error ? error.message : String(error),
+        retry: () => void refetch(),
+      };
+    }
+    return enabled ? { status: "loading" } : { status: "idle" };
+  }, [frames, isError, isPlaceholderData, error, refetch, enabled]);
 }
 
 export function useWorkspace(): WorkspaceState {

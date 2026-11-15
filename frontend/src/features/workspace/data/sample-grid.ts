@@ -1,6 +1,6 @@
 import { bbox, booleanPointInPolygon, hexGrid } from "@turf/turf";
-import { LAYERS, LAYER_ORDER } from "../layers";
-import type { GridCell, LayerId } from "../types";
+import { LAYERS, SAMPLE_LAYER_ORDER } from "../layers";
+import type { GridCell, SampleLayerId } from "../types";
 import { EL_SALVADOR } from "./outline";
 
 /** Hexagon side length of the sample grid, in kilometers. */
@@ -99,7 +99,7 @@ function interpolate(x: number, table: readonly LngLat[]): number {
   return table[table.length - 1][1];
 }
 
-function rawFields(lng: number, lat: number): Record<LayerId, number> {
+function rawFields(lng: number, lat: number): Record<SampleLayerId, number> {
   const inland = Math.max(0, lat - interpolate(lng, COAST_LAT));
   const chain = gaussian(distanceToPolyline(lng, lat, VOLCANIC_CHAIN), 0.09);
   const north = gaussian(distanceToPolyline(lng, lat, NORTHERN_HIGHLANDS), 0.12);
@@ -136,7 +136,7 @@ function rawFields(lng: number, lat: number): Record<LayerId, number> {
 
 function buildGrid(): readonly GridCell[] {
   const hexes = hexGrid(bbox(EL_SALVADOR), CELL_SIDE_KM, { units: "kilometers" });
-  const kept: { polygon: LngLat[]; center: LngLat; raw: Record<LayerId, number> }[] = [];
+  const kept: { polygon: LngLat[]; center: LngLat; raw: Record<SampleLayerId, number> }[] = [];
 
   for (const hex of hexes.features) {
     const ring = hex.geometry.coordinates[0];
@@ -154,13 +154,13 @@ function buildGrid(): readonly GridCell[] {
   }
 
   const ranges = Object.fromEntries(
-    LAYER_ORDER.map((id) => {
+    SAMPLE_LAYER_ORDER.map((id) => {
       const vals = kept.map((c) => c.raw[id]);
       return [id, [Math.min(...vals), Math.max(...vals)] as const];
     }),
-  ) as Record<LayerId, readonly [number, number]>;
+  ) as Record<SampleLayerId, readonly [number, number]>;
 
-  const scale = (id: LayerId, raw: number): number => {
+  const scale = (id: SampleLayerId, raw: number): number => {
     const [rMin, rMax] = ranges[id];
     const [dMin, dMax] = LAYERS[id].domain;
     const margin = (dMax - dMin) * 0.03;
