@@ -3,7 +3,7 @@
 import { Square } from "lucide-react";
 import { LAYER_ORDER } from "../layers";
 import { focusMapCanvas } from "../map/focus";
-import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
+import { useMapController, usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import { Panel, PanelGroup } from "../ui/Panel";
 import { formatHectares } from "./format";
@@ -11,8 +11,13 @@ import { LayerRow } from "./LayerRow";
 
 /** Left "Browser" panel: the drawn plot and the sample data layers (one visible at a time). */
 export function BrowserPanel() {
+  const collapse = usePanelCollapse("browser", t.browser.title);
   return (
-    <Panel title={t.browser.title} labelledBy="browser-title" className="h-full">
+    <Panel
+      title={t.browser.title}
+      labelledBy="browser-title"
+      collapse={collapse}
+    >
       <PlotsGroup />
       <PanelGroup label={t.browser.layers} count={LAYER_ORDER.length}>
         <ul>

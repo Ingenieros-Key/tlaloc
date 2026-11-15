@@ -1,36 +1,46 @@
 "use client";
 
-import { Info, MapPinOff, SquareDashed } from "lucide-react";
+import { MapPinOff, SquareDashed } from "lucide-react";
 import type { ReactNode } from "react";
 import { focusMapCanvas } from "../map/focus";
-import { useWorkspace, useWorkspaceDispatch } from "../store";
+import { usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
 import { CropCard } from "./CropCard";
+import { DisplayPanel } from "./DisplayPanel";
 import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
 
 /** Right "Inspector" panel: plot facts and the per-crop planting outlook for the drawn square. */
 export function InspectorPanel() {
-  const { plotSummary, analysis } = useWorkspace();
+  const { plotSummary, analysis, inspectorView } = useWorkspace();
+  const showDisplay = inspectorView === "display";
+  const title = showDisplay ? t.inspector.display.title : t.inspector.title;
+  const collapse = usePanelCollapse("inspector", title);
+
+  if (showDisplay) {
+    return (
+      <Panel title={title} labelledBy="inspector-title" collapse={collapse}>
+        <DisplayPanel />
+      </Panel>
+    );
+  }
 
   return (
-    <Panel title={t.inspector.title} labelledBy="inspector-title" className="h-full">
-      <div className="flex min-h-full flex-col">
-        <div className="flex-1 divide-y divide-line">
-          <Section id="inspector-plot" heading={t.inspector.plotHeading}>
-            {plotSummary ? <PlotFacts summary={plotSummary} analysis={analysis} /> : <EmptyPlot />}
+    <Panel
+      title={title}
+      labelledBy="inspector-title"
+      collapse={collapse}
+    >
+      <div className="divide-y divide-line">
+        <Section id="inspector-plot" heading={t.inspector.plotHeading}>
+          {plotSummary ? <PlotFacts summary={plotSummary} analysis={analysis} /> : <EmptyPlot />}
+        </Section>
+        {plotSummary ? (
+          <Section id="inspector-outlook" heading={t.inspector.outlookHeading}>
+            <Outlook analysis={analysis} />
           </Section>
-          {plotSummary ? (
-            <Section id="inspector-outlook" heading={t.inspector.outlookHeading}>
-              <Outlook analysis={analysis} />
-            </Section>
-          ) : null}
-        </div>
-        <p className="sticky bottom-0 flex items-start gap-2 border-t border-line bg-surface px-3 py-2 text-xs text-muted">
-          <Info aria-hidden="true" strokeWidth={1.75} className="mt-px size-3.5 shrink-0" />
-          <span>{t.inspector.sampleFooter}</span>
-        </p>
+        ) : null}
       </div>
     </Panel>
   );

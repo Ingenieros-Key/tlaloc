@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Satellite,
   ScanSearch,
+  SlidersHorizontal,
   Square,
   SquarePen,
   Trash2,
@@ -26,6 +27,7 @@ import {
 } from "react";
 import { t } from "../strings";
 import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
+import { DRAWER_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import type { Basemap, Tool } from "../types";
 
 const s = t.chrome.ribbon;
@@ -73,6 +75,8 @@ export function Ribbon() {
   const needsPlotId = useId();
 
   const { tool, plot, is3d, basemap } = state;
+  const displayOn = state.inspectorView === "display";
+  const drawerLayout = useMediaQuery(DRAWER_QUERY);
   const hasPlot = plot !== null;
   const running = state.analysis.status === "running";
 
@@ -258,6 +262,21 @@ export function Ribbon() {
             onPress={() => controller.get()?.resetView()}
           />
           <BasemapSwitch value={basemap} onChange={(next) => dispatch({ type: "setBasemap", basemap: next })} />
+          <RibbonButton
+            id="display"
+            icon={SlidersHorizontal}
+            label={s.display}
+            title={s.tooltip(s.displayTip)}
+            pressed={displayOn}
+            onPress={() => {
+              dispatch({ type: "setInspectorView", view: displayOn ? "results" : "display" });
+              // Below lg the card is a drawer: opening Display slides it in.
+              if (!displayOn && drawerLayout) {
+                dispatch({ type: "setPanel", panel: "inspector", open: true });
+                dispatch({ type: "setPanel", panel: "browser", open: false });
+              }
+            }}
+          />
         </RibbonGroup>
         <p
           aria-live="polite"

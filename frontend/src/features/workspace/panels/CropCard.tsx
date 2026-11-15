@@ -1,6 +1,7 @@
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import { RATING_THRESHOLDS } from "../data/crops";
 import { LAYERS } from "../layers";
+import { useWorkspace } from "../store";
 import { t } from "../strings";
 import type { CropAssessment, FactorScore } from "../types";
 import { Badge } from "../ui/Badge";
@@ -36,6 +37,7 @@ export function CropCard({
   /** Highest-scoring crop for the plot (every crop tied for the top score is marked). */
   readonly best?: boolean;
 }) {
+  const showLimiting = useWorkspace().display.limiting;
   const nameId = `crop-${assessment.crop}-title`;
   const allWithin = assessment.limiting === null;
   const LimitIcon = allWithin ? CircleCheck : TriangleAlert;
@@ -70,14 +72,16 @@ export function CropCard({
           <FactorRow key={factor.layer} factor={factor} />
         ))}
       </ul>
-      <p className="mt-3 flex items-start gap-1.5 border-t border-line pt-2 text-xs text-muted">
-        <LimitIcon
-          aria-hidden="true"
-          strokeWidth={1.75}
-          className={`mt-px size-3.5 shrink-0 ${allWithin ? "text-good" : "text-fair"}`}
-        />
-        <span>{limitingSentence(assessment)}</span>
-      </p>
+      {showLimiting ? (
+        <p className="mt-3 flex items-start gap-1.5 border-t border-line pt-2 text-xs text-muted">
+          <LimitIcon
+            aria-hidden="true"
+            strokeWidth={1.75}
+            className={`mt-px size-3.5 shrink-0 ${allWithin ? "text-good" : "text-fair"}`}
+          />
+          <span>{limitingSentence(assessment)}</span>
+        </p>
+      ) : null}
     </article>
   );
 }

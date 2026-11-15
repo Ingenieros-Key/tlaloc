@@ -3,6 +3,8 @@ import type { Basemap, Tool } from "../types";
 /** UI strings for the chrome area. Owned by the chrome module; add keys freely. */
 export const chrome = {
   closePanel: "Close panel",
+  collapsePanel: (panel: string) => `Collapse ${panel}`,
+  expandPanel: (panel: string) => `Expand ${panel}`,
   topBar: {
     projectLabel: "Project:",
     projectName: "Untitled plot",
@@ -37,6 +39,8 @@ export const chrome = {
     analyze: "Analyze",
     analyzing: "Analyzing",
     analyzeTip: "Re-run the planting outlook for the plot",
+    display: "Display",
+    displayTip: "Show or hide map items, legends and notes",
     focusPlot: "Focus plot",
     focusPlotTip: "Zoom the map to the plot",
     threeD: "3D",
@@ -49,7 +53,7 @@ export const chrome = {
       satellite: "Satellite",
     } satisfies Record<Basemap, string>,
     basemapTips: {
-      map: "Dark vector street map",
+      map: "Vector street map",
       satellite: "NASA GIBS satellite imagery",
     } satisfies Record<Basemap, string>,
     needsPlot: "draw a plot first",
@@ -82,6 +86,21 @@ export const chrome = {
     zoomOut: "Zoom out",
     resetNorth: "Reset north",
     home: "Reset view",
+    goTo: {
+      button: "Go to",
+      title: "Go to",
+      latitude: "Latitude",
+      longitude: "Longitude",
+      latitudePlaceholder: "13.6929",
+      longitudePlaceholder: "-89.2182",
+      submit: "Go",
+      clearPin: "Clear pin",
+      pick: "Pick on map",
+      pickHint: "Click the map to place the pin",
+      cancelPick: "Cancel",
+      latitudeError: "Enter a latitude between -90 and 90.",
+      longitudeError: "Enter a longitude between -180 and 180.",
+    },
     /** Compact zoom readout, e.g. "Z 8.3". */
     zoomReadout: (zoom: number): string => `Z ${zoom.toFixed(1)}`,
   },
