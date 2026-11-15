@@ -6,7 +6,7 @@ export const common = {
   sampleData: "Sample data",
   modelNotice: "Exploratory",
   modelNoticeHint:
-    "Scores come from the crop viability model: NASA POWER temperature, rainfall and humidity over the last 12 months, and NASA SRTM elevation. Temperature and rainfall ranges follow FAO ECOCROP; elevation and humidity ranges are partly exploratory. Not yet validated for El Salvador.",
+    "Scores come from the crop viability model: NASA POWER temperature, rainfall and humidity averaged over the last 5 complete years, and NASA SRTM elevation. Temperature and rainfall ranges follow FAO ECOCROP; elevation and humidity ranges are partly exploratory. Not yet validated for El Salvador.",
   layers: {
     humidity: "Humidity",
     rain: "Rainfall",

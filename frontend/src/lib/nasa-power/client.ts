@@ -9,7 +9,7 @@ const API_ROOT = "https://power.larc.nasa.gov/api/temporal";
 /** User community; it sets the units POWER answers in. AG = agroclimatology. */
 export type PowerCommunity = "AG" | "RE" | "SB";
 
-/** "YYYYMMDD" */
+/** "YYYYMMDD" for daily requests; "YYYY" for monthly ones. */
 export type PowerDate = string;
 
 type Common = {
@@ -36,7 +36,10 @@ export type RegionalQuery = Common & {
   };
 };
 
-/** Daily values for one parameter, keyed by "YYYYMMDD". Missing data (POWER's fill value) is null. */
+/**
+ * Values for one parameter, keyed by "YYYYMMDD" (daily) or "YYYYMM" (monthly, where month 13 is the
+ * whole year). Missing data (POWER's fill value) is null.
+ */
 export type DailySeries = Readonly<Record<PowerDate, number | null>>;
 
 export type PowerLocation = {
@@ -73,8 +76,29 @@ export class PowerError extends Error {
 }
 
 /** Daily data for one point. */
-export async function fetchDailyPoint(query: PointQuery): Promise<PowerResult<PowerLocation>> {
-  const url = buildUrl("daily/point", query, {
+export function fetchDailyPoint(query: PointQuery): Promise<PowerResult<PowerLocation>> {
+  return fetchPoint("daily", query);
+}
+
+/** Monthly data for one point, plus each year's annual value (month "13"). `start`/`end` are years. */
+export function fetchMonthlyPoint(query: PointQuery): Promise<PowerResult<PowerLocation>> {
+  return fetchPoint("monthly", query);
+}
+
+/** Daily data for every POWER grid cell inside a bounding box. */
+export function fetchDailyRegional(query: RegionalQuery): Promise<PowerResult<readonly PowerLocation[]>> {
+  return fetchRegional("daily", query);
+}
+
+/** Monthly and annual data for every POWER grid cell inside a bounding box. `start`/`end` are years. */
+export function fetchMonthlyRegional(query: RegionalQuery): Promise<PowerResult<readonly PowerLocation[]>> {
+  return fetchRegional("monthly", query);
+}
+
+type Temporal = "daily" | "monthly";
+
+async function fetchPoint(temporal: Temporal, query: PointQuery): Promise<PowerResult<PowerLocation>> {
+  const url = buildUrl(`${temporal}/point`, query, {
     longitude: round(query.longitude),
     latitude: round(query.latitude),
   });
@@ -86,12 +110,12 @@ export async function fetchDailyPoint(query: PointQuery): Promise<PowerResult<Po
   };
 }
 
-/** Daily data for every POWER grid cell inside a bounding box. */
-export async function fetchDailyRegional(
+async function fetchRegional(
+  temporal: Temporal,
   query: RegionalQuery,
 ): Promise<PowerResult<readonly PowerLocation[]>> {
   const { west, south, east, north } = query.bbox;
-  const url = buildUrl("daily/regional", query, {
+  const url = buildUrl(`${temporal}/regional`, query, {
     "longitude-min": round(west),
     "longitude-max": round(east),
     "latitude-min": round(south),

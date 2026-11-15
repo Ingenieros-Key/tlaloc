@@ -19,12 +19,9 @@ import { readSavedPlot, writeSavedPlot } from "./data/saved";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   DEFAULT_PRESET_DAYS,
-  buildLayerAggregate,
   buildLayerFrames,
   latestWindow,
-  HUMIDITY_PARAMETER,
   PRECIP_PARAMETER,
-  TEMP_PARAMETER,
   pointQuery,
   layerRegionalQuery,
   presetRange,
@@ -32,6 +29,14 @@ import {
   type PrecipWindow,
 } from "./data/precip";
 import { getSampleGrid } from "./data/sample-grid";
+import {
+  climateAt,
+  climateField,
+  climatePointQuery,
+  climateRegionalQuery,
+  climateYears,
+  type Climate,
+} from "./data/climate";
 import { elevationQuery } from "./data/elevation";
 import { buildScoreField, type ScoreField } from "./data/score";
 import { LAYER_ORDER, defaultLayerSettings, isPowerLayer, isTwoLayerMode } from "./layers";
@@ -41,7 +46,6 @@ import type {
   Basemap,
   CropId,
   DataStyle,
-  FactorId,
   DisplayKey,
   DisplaySettings,
   InspectorView,
@@ -608,7 +612,7 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
     // The outlook waits for the plot's NASA climate and elevation. The viability model needs all
     // four values, so a failed request leaves the plot unscored and says which value is missing.
     if (!plot || plotClimate.status === "loading" || elevationPending) return;
-    const climate = plotClimate.status === "ready" ? plotClimate.measured : {};
+    const climate = plotClimate.status === "ready" ? plotClimate.climate : null;
     const timer = window.setTimeout(() => {
       const result = computeAssessment(plot, getSampleGrid(), climate, elevationValues);
       dispatch({ type: "analysisFinished", analysis: { status: "done", result } });
@@ -622,7 +626,7 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   const layerData = useLayerQuery(scoring ? null : state.activeLayer, range);
   const layerDataB = useLayerQuery(isTwoLayerMode(state.viewMode) ? state.secondLayer : null, range);
   const scoreData = useScoreData(scoring, state.scoreCrop);
-  const plotRain = plotClimate.status === "ready" ? plotClimate.monthlyRain : null;
+  const plotRain = usePlotMonthlyRain(state.plotSummary?.centroid ?? null);
   // Elevation has no days: as the active layer of a two-layer view, the timeline follows the other.
   const { activeLayer, secondLayer, viewMode } = state;
   const timelineFromB = activeLayer === "elevation" && isTwoLayerMode(viewMode) && isPowerLayer(secondLayer);
@@ -720,19 +724,17 @@ function usePowerLayerQuery(layer: PowerLayerId | null, range: PrecipWindow | nu
   }, [frames, isError, isPlaceholderData, error, refetch, enabled]);
 }
 
-/** Days the crop outlook looks back over. */
-const OUTLOOK_DAYS = 365;
-
 /**
- * The Crop score view: the last 12 months of rainfall, temperature and humidity over the country
- * (three regional requests, cached like any layer) reduced to one value per cell, plus elevation,
- * scored for `crop` with the plot outlook's viability model. Changing the crop only re-scores.
+ * The Crop score view: rainfall, temperature and humidity averaged over the last complete years
+ * (three small monthly regional requests, cached like any layer) and interpolated to each cell,
+ * plus elevation, scored for `crop` with the plot outlook's viability model. Changing the crop only
+ * re-scores.
  */
 function useScoreData(enabled: boolean, crop: CropId): ScoreState {
-  const [range] = useState(() => presetRange(OUTLOOK_DAYS));
-  const rain = useQuery({ ...layerRegionalQuery("precip", range), enabled });
-  const temp = useQuery({ ...layerRegionalQuery("temp", range), enabled });
-  const humidity = useQuery({ ...layerRegionalQuery("humidity", range), enabled });
+  const [years] = useState(() => climateYears());
+  const rain = useQuery({ ...climateRegionalQuery("rain", years), enabled });
+  const temp = useQuery({ ...climateRegionalQuery("temp", years), enabled });
+  const humidity = useQuery({ ...climateRegionalQuery("humidity", years), enabled });
   const elevation = useQuery({ ...elevationQuery(), enabled });
   const rainData = rain.data;
   const tempData = temp.data;
@@ -742,13 +744,13 @@ function useScoreData(enabled: boolean, crop: CropId): ScoreState {
     () =>
       enabled && rainData && tempData && humidityData && elevationData
         ? {
-            rain: buildLayerAggregate(rainData.data, "precip", OUTLOOK_DAYS),
-            temp: buildLayerAggregate(tempData.data, "temp", OUTLOOK_DAYS),
-            humidity: buildLayerAggregate(humidityData.data, "humidity", OUTLOOK_DAYS),
+            rain: climateField(rainData.data, "rain", years),
+            temp: climateField(tempData.data, "temp", years),
+            humidity: climateField(humidityData.data, "humidity", years),
             elevation: elevationData.values[0],
           }
         : null,
-    [enabled, rainData, tempData, humidityData, elevationData],
+    [enabled, rainData, tempData, humidityData, elevationData, years],
   );
   const field = useMemo(() => (climate ? buildScoreField(climate, crop) : null), [climate, crop]);
   const failed = rain.isError || temp.isError || humidity.isError || elevation.isError;
@@ -774,65 +776,56 @@ function useScoreData(enabled: boolean, crop: CropId): ScoreState {
   }, [enabled, field, failed, refetchRain, refetchTemp, refetchHumidity, refetchElevation]);
 }
 
-/** The plot's climate over the last 12 months, from NASA POWER. */
+/** The plot's climate: the average of the last complete years, from NASA POWER. */
 type PlotClimate =
   | { readonly status: "none" | "loading" | "error" }
-  | {
-      readonly status: "ready";
-      readonly measured: Partial<Record<Exclude<FactorId, "elevation">, number>>;
-      /** Rainfall per calendar month over the same 12 months (the rotation's season axis). */
-      readonly monthlyRain: readonly number[] | null;
-    };
+  | { readonly status: "ready"; readonly climate: Climate };
 
 /** Plot centres are rounded to ~5 km: POWER's cells are ~55 km, so small edits reuse the answer. */
 function roundForClimate(value: number): number {
   return Math.round(value * 20) / 20;
 }
 
-/** Sum and count of the valid (non-missing) days of a daily series. */
-function totals(series: Readonly<Record<string, number | null>> | undefined): { sum: number; days: number } {
-  let sum = 0;
-  let days = 0;
-  for (const value of Object.values(series ?? {})) {
-    if (value === null) continue;
-    sum += value;
-    days += 1;
-  }
-  return { sum, days };
-}
-
 /**
- * The crop outlook's measured factors at the plot, from one NASA POWER request over the last 12
- * months: rainfall (total, scaled to a full year when the newest days are not published yet),
- * relative humidity and air temperature (both means). Any parameter without data is left out, and
- * the outlook then reports it as missing (the viability model needs every value).
+ * The crop outlook's climate at the plot, from one NASA POWER monthly request: each year's annual
+ * rainfall total, mean temperature and mean relative humidity over the last complete years (see
+ * `climate.ts`), and their averages. A factor with no annual value in any year is left out, and the
+ * outlook then reports it as missing (the viability model needs every value).
  */
 function usePlotClimate(center: readonly [number, number] | null): PlotClimate {
-  const [range] = useState(() => presetRange(OUTLOOK_DAYS));
+  const [years] = useState(() => climateYears());
   const lng = center ? roundForClimate(center[0]) : null;
   const lat = center ? roundForClimate(center[1]) : null;
-  const query = useQuery({
-    ...pointQuery([lng ?? 0, lat ?? 0], range, [PRECIP_PARAMETER, HUMIDITY_PARAMETER, TEMP_PARAMETER]),
+  const { data, isError } = useQuery({
+    ...climatePointQuery([lng ?? 0, lat ?? 0], years),
     enabled: lng !== null && lat !== null,
   });
-  const { data, isError } = query;
   return useMemo<PlotClimate>(() => {
     if (lng === null) return { status: "none" };
     if (data) {
-      const series = data.data.series;
-      const measured: Partial<Record<Exclude<FactorId, "elevation">, number>> = {};
-      const rain = totals(series[PRECIP_PARAMETER]);
-      if (rain.days > 0) measured.rain = (rain.sum * OUTLOOK_DAYS) / rain.days;
-      const humidity = totals(series[HUMIDITY_PARAMETER]);
-      if (humidity.days > 0) measured.humidity = humidity.sum / humidity.days;
-      const temp = totals(series[TEMP_PARAMETER]);
-      if (temp.days > 0) measured.temp = temp.sum / temp.days;
-      return Object.keys(measured).length > 0
-        ? { status: "ready", measured, monthlyRain: monthlyTotals(series[PRECIP_PARAMETER]) }
-        : { status: "error" };
+      const climate = climateAt(data.data, years);
+      return climate.years.length > 0 ? { status: "ready", climate } : { status: "error" };
     }
     return isError ? { status: "error" } : { status: "loading" };
-  }, [lng, data, isError]);
+  }, [lng, data, isError, years]);
+}
+
+/** Days the rotation's rainfall bars look back over. */
+const RAIN_BAR_DAYS = 365;
+
+/**
+ * Rainfall per calendar month at the plot over the last 12 months (the rotation's season axis):
+ * recent seasons, unlike the outlook's multi-year average. Null until loaded.
+ */
+function usePlotMonthlyRain(center: readonly [number, number] | null): readonly number[] | null {
+  const [range] = useState(() => presetRange(RAIN_BAR_DAYS));
+  const lng = center ? roundForClimate(center[0]) : null;
+  const lat = center ? roundForClimate(center[1]) : null;
+  const { data } = useQuery({
+    ...pointQuery([lng ?? 0, lat ?? 0], range, [PRECIP_PARAMETER]),
+    enabled: lng !== null && lat !== null,
+  });
+  return useMemo(() => (lng !== null && data ? monthlyTotals(data.data.series[PRECIP_PARAMETER]) : null), [lng, data]);
 }
 
 export function useWorkspace(): WorkspaceState {
