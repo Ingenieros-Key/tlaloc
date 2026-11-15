@@ -16,7 +16,7 @@ export const SAMPLE_LAYER_ORDER: readonly SampleLayerId[] = ["humidity", "rain",
 /** Layers listed in the Browser and drawable on the map, in Browser order. */
 export const LAYER_ORDER: readonly LayerId[] = ["precip", "temp", "humidity", "moisture", "elevation"];
 
-/** Crop outlook factors, in the order its cards list them: by weight in the viability model. */
+/** Crop outlook factors, in the order its cards list them (the same for every crop). */
 export const FACTOR_ORDER: readonly FactorId[] = ["rain", "temp", "humidity", "elevation"];
 
 /** Layers whose values come from a live source instead of the sample grid (all Browser layers). */
