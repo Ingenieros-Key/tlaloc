@@ -12,17 +12,23 @@ import {
 } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TerraDraw } from "terra-draw";
+import type { Theme } from "@/lib/theme";
 import { getSampleGrid } from "../data/sample-grid";
+import { useAppTheme } from "../hooks/useAppTheme";
 import { LAYERS, formatValue } from "../layers";
 import { useMapController, useWorkspace, useWorkspaceDispatch } from "../store";
 import { t } from "../strings";
 import type { Basemap, GridCell, LayerId, LayerSettings, MapController, ViewState } from "../types";
 import { IconButton } from "../ui/IconButton";
-import { FALLBACK_STYLE, basemapStyle, findOverlayAnchor } from "./basemaps";
+import { FALLBACK_STYLE, basemapStyle, findOverlayAnchor, needsStyleSwap } from "./basemaps";
 import { DATA_LAYER_ID, buildDeckLayers, deckGroupId } from "./deckLayers";
 import { MAP_CONTAINER_ID } from "./focus";
 import {
   COUNTRY_BOUNDS,
+  INTRO_CENTER,
+  INTRO_FLIGHT_MS,
+  INTRO_HOLD_MS,
+  INTRO_ZOOM,
   MAX_PITCH,
   PITCH_3D,
   PLOT_MAX_ZOOM,
@@ -84,7 +90,8 @@ function roundView(map: MapLibreMap): ViewState {
 }
 
 /**
- * The workspace map: MapLibre basemap (OpenFreeMap dark or NASA GIBS), interleaved deck.gl sample
+ * The workspace map: MapLibre basemap (OpenFreeMap dark/Positron following the app theme, or NASA
+ * GIBS), interleaved deck.gl sample
  * data and country outline, and terra-draw for the single plot rectangle. Registers the camera
  * controller used by the ribbon and nav bar.
  */
@@ -93,6 +100,7 @@ export function MapView() {
   const dispatch = useWorkspaceDispatch();
   const { register } = useMapController();
   const { activeLayer, layerSettings, basemap, is3d, tool, plot } = state;
+  const theme = useAppTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -102,23 +110,30 @@ export function MapView() {
   const stateRef = useRef(state);
   const beforeIdRef = useRef<string | undefined>(undefined);
   const appliedBasemapRef = useRef<Basemap>(basemap);
+  const appliedThemeRef = useRef<Theme>(theme);
+  const themeRef = useRef<Theme>(theme);
   const styleLoadedRef = useRef(false);
   const fallbackRef = useRef(false);
+  /** True while the opening globe flight runs; deck layers stay hidden until it ends. */
+  const introRef = useRef(false);
 
   const [beforeId, setBeforeId] = useState<string | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
   const [readyBasemap, setReadyBasemap] = useState<Basemap>(basemap);
   const [notice, setNotice] = useState<NoticeKind | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
+  const [introActive, setIntroActive] = useState(false);
 
   const cells = useMemo(() => getSampleGrid(), []);
+  // deck.gl's interleaved polygons tear on the globe, so the data waits for the flat map.
   const layers = useMemo(
-    () => buildDeckLayers({ cells, activeLayer, layerSettings, beforeId }),
-    [cells, activeLayer, layerSettings, beforeId],
+    () => (introActive ? [] : buildDeckLayers({ cells, activeLayer, layerSettings, beforeId })),
+    [introActive, cells, activeLayer, layerSettings, beforeId],
   );
 
   useEffect(() => {
     stateRef.current = state;
+    themeRef.current = theme;
   });
 
   useEffect(() => {
@@ -126,15 +141,26 @@ export function MapView() {
     if (!container) return;
     const initial = stateRef.current;
     appliedBasemapRef.current = initial.basemap;
+    appliedThemeRef.current = themeRef.current;
+
+    // Intro: open on the globe and fly in on load. Reduced motion opens on the country directly.
+    const intro = motionMs(INTRO_FLIGHT_MS) > 0;
+    introRef.current = intro;
+    if (intro) queueMicrotask(() => setIntroActive(true));
+    const camera = intro
+      ? { center: INTRO_CENTER, zoom: INTRO_ZOOM, pitch: 0 }
+      : {
+          bounds: COUNTRY_BOUNDS,
+          fitBoundsOptions: { padding: cameraPadding(container) },
+          pitch: initial.is3d ? PITCH_3D : 0,
+        };
 
     let map: MapLibreMap;
     try {
       map = new MapLibreMap({
         container,
-        style: basemapStyle(initial.basemap),
-        bounds: COUNTRY_BOUNDS,
-        fitBoundsOptions: { padding: cameraPadding(container) },
-        pitch: initial.is3d ? PITCH_3D : 0,
+        style: basemapStyle(initial.basemap, themeRef.current),
+        ...camera,
         maxPitch: initial.is3d ? MAX_PITCH : 0,
         attributionControl: false,
         locale: { "Map.Title": t.map.canvasLabel },
@@ -152,6 +178,7 @@ export function MapView() {
     let moveFrame = 0;
 
     const currentLayers = () => {
+      if (introRef.current) return [];
       const s = stateRef.current;
       return buildDeckLayers({
         cells,
@@ -197,6 +224,13 @@ export function MapView() {
       styleLoadedRef.current = true;
       if (!fallbackRef.current) setNotice(null);
 
+      // The globe is only for the intro flight; setStyle resets projection and sky, so a style
+      // swap mid-flight reapplies them and one afterwards falls back to the flat map.
+      if (introRef.current) {
+        map.setProjection({ type: "globe" });
+        map.setSky({ "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 1, 7, 0] });
+      }
+
       if (drawRef.current) stopTerraDraw(drawRef.current);
       const draw = createTerraDraw(map);
       draw.start();
@@ -227,7 +261,7 @@ export function MapView() {
 
     const onIdle = () => {
       const overlay = overlayRef.current;
-      if (!overlay || !styleLoadedRef.current) return;
+      if (!overlay || !styleLoadedRef.current || introRef.current) return;
       if (map.getLayer(deckGroupId(beforeIdRef.current))) {
         setReadyBasemap(appliedBasemapRef.current);
         return;
@@ -312,11 +346,38 @@ export function MapView() {
       placePlotAtCenter();
     };
 
+    let introTimer = 0;
+    /** Lands the intro: flat map, data layers on. Runs once, when the flight ends or is interrupted. */
+    const endIntro = () => {
+      if (!introRef.current) return;
+      introRef.current = false;
+      window.clearTimeout(introTimer);
+      map.off("movestart", onIntroMoveStart);
+      map.setProjection({ type: "mercator" });
+      setIntroActive(false);
+      overlayRef.current?.setProps({ layers: currentLayers() });
+    };
+    const startFlight = () => {
+      map.off("movestart", onIntroMoveStart);
+      fitCountry(INTRO_FLIGHT_MS);
+      map.once("moveend", endIntro);
+    };
+    /** The user grabbed the globe before the flight began: skip it and hand over the camera. */
+    const onIntroMoveStart = (e: { originalEvent?: unknown }) => {
+      if (e.originalEvent) endIntro();
+    };
+
     const onLoad = () => {
       window.clearTimeout(loadTimer);
       setLoaded(true);
       setNotice((current) => (current === "slow" ? null : current));
       publishView();
+      // A drag, scroll or camera button during the flight interrupts it (MapLibre's default), which
+      // also fires moveend and lands the intro where the user stopped it.
+      if (intro) {
+        map.on("movestart", onIntroMoveStart);
+        introTimer = window.setTimeout(startFlight, INTRO_HOLD_MS);
+      }
     };
 
     const loadTimer = window.setTimeout(() => {
@@ -332,6 +393,9 @@ export function MapView() {
 
     return () => {
       window.clearTimeout(loadTimer);
+      window.clearTimeout(introTimer);
+      map.off("movestart", onIntroMoveStart);
+      map.off("moveend", endIntro);
       if (moveFrame) cancelAnimationFrame(moveFrame);
       register(null);
       container.removeEventListener("keydown", onKeyDown);
@@ -386,8 +450,15 @@ export function MapView() {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || appliedBasemapRef.current === basemap) return;
+    if (!map) return;
+    const from = { basemap: appliedBasemapRef.current, theme: appliedThemeRef.current };
+    if (!needsStyleSwap(from, { basemap, theme })) {
+      // Satellite looks the same in both themes; remember the theme for the next street swap.
+      appliedThemeRef.current = theme;
+      return;
+    }
     appliedBasemapRef.current = basemap;
+    appliedThemeRef.current = theme;
     styleLoadedRef.current = false;
     fallbackRef.current = false;
     if (drawRef.current) stopTerraDraw(drawRef.current);
@@ -395,15 +466,17 @@ export function MapView() {
     beforeIdRef.current = undefined;
     const s = stateRef.current;
     overlayRef.current?.setProps({
-      layers: buildDeckLayers({
-        cells,
-        activeLayer: s.activeLayer,
-        layerSettings: s.layerSettings,
-        beforeId: undefined,
-      }),
+      layers: introRef.current
+        ? []
+        : buildDeckLayers({
+            cells,
+            activeLayer: s.activeLayer,
+            layerSettings: s.layerSettings,
+            beforeId: undefined,
+          }),
     });
-    map.setStyle(basemapStyle(basemap), { diff: false });
-  }, [basemap, cells]);
+    map.setStyle(basemapStyle(basemap, theme), { diff: false });
+  }, [basemap, theme, cells]);
 
   useEffect(() => {
     const draw = drawRef.current;
