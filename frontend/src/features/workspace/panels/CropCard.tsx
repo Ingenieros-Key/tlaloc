@@ -1,5 +1,5 @@
 import { CircleCheck, TriangleAlert } from "lucide-react";
-import { RATING_THRESHOLDS } from "../data/crops";
+import { CROPS, RATING_THRESHOLDS } from "../data/crops";
 import { LAYERS } from "../layers";
 import { useWorkspace } from "../store";
 import { t } from "../strings";
@@ -54,6 +54,11 @@ export function CropCard({
               {t.common.crops[assessment.crop]}
             </h4>
             {best ? <Badge tone="accent">{t.inspector.bestMatch}</Badge> : null}
+            {CROPS[assessment.crop].sample ? (
+              <span title={t.rotation.sampleProfileHint}>
+                <Badge>{t.rotation.sampleProfile}</Badge>
+              </span>
+            ) : null}
           </div>
           <Badge tone={assessment.rating}>{t.common.ratings[assessment.rating]}</Badge>
         </div>

@@ -14,6 +14,8 @@ import {
 } from "react";
 import { computeAssessment } from "./data/assessment";
 import { summarizePlot } from "./data/plot";
+import { monthlyTotals, type Planting, type Priority } from "./data/rotation";
+import { readSavedPlot, writeSavedPlot } from "./data/saved";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   DEFAULT_PRESET_DAYS,
@@ -53,6 +55,12 @@ import type {
 } from "./types";
 
 export type PanelId = "browser" | "inspector";
+
+/** Which of the plot's results the Inspector shows: the planting outlook or the rotation. */
+export type InspectorTab = "outlook" | "rotation";
+
+/** Seasons the rotation looks ahead: by default, and after "Show later seasons". */
+export const ROTATION_SEASONS = { short: 4, long: 6 } as const;
 
 /** What the left flyout shows: the plot list, or the active view mode's controls. */
 export type BrowserSection = "plots" | "tool";
@@ -126,6 +134,19 @@ export type WorkspaceState = {
    * the plot's results in the Inspector (see `inspectorVisible`).
    */
   readonly focus: boolean;
+  /** The farmer's last planting on the plot; null until they fill the form. Cleared with the plot. */
+  readonly planting: Planting | null;
+  /** What the farmer says matters most; it can lift the sheet's 2nd choice over the 1st. */
+  readonly priority: Priority;
+  readonly inspectorTab: InspectorTab;
+  /** Which of the first season's options the rotation sows (0 = the top one). */
+  readonly rotationStart: number;
+  /** How many seasons the rotation looks ahead (see `ROTATION_SEASONS`). */
+  readonly rotationSeasons: number;
+  /** The plan lanes dock is open; it takes the timeline's place (see `lanesVisible`). */
+  readonly lanesOpen: boolean;
+  /** Rainfall per calendar month (0 = January) at the plot over the last 12 months; null until loaded. */
+  readonly plotRain: readonly number[] | null;
   readonly analysis: AnalysisState;
   /** Bumped by "Analyze" to force a re-run on the same plot. */
   readonly analysisNonce: number;
@@ -148,7 +169,7 @@ export type WorkspaceState = {
 };
 
 /** What the reducer owns: everything except state derived from queries. */
-type ReducerState = Omit<WorkspaceState, "layerData" | "layerDataB" | "scoreData">;
+type ReducerState = Omit<WorkspaceState, "layerData" | "layerDataB" | "scoreData" | "plotRain">;
 
 export type WorkspaceAction =
   | { readonly type: "setTool"; readonly tool: Tool }
@@ -176,6 +197,20 @@ export type WorkspaceAction =
   | { readonly type: "clearPlot" }
   | { readonly type: "setPlotName"; readonly name: string }
   | { readonly type: "setFocus"; readonly focus: boolean }
+  | { readonly type: "setPlanting"; readonly planting: Planting | null }
+  | { readonly type: "setPriority"; readonly priority: Priority }
+  | { readonly type: "setInspectorTab"; readonly tab: InspectorTab }
+  | { readonly type: "setRotationStart"; readonly start: number }
+  | { readonly type: "setRotationSeasons"; readonly seasons: number }
+  | { readonly type: "setLanesOpen"; readonly open: boolean }
+  /** The plot and answers kept from the last visit (ignored once a plot exists). */
+  | {
+      readonly type: "restoreSaved";
+      readonly plot: PlotFeature;
+      readonly plotName: string;
+      readonly planting: Planting | null;
+      readonly priority: Priority;
+    }
   | { readonly type: "runAnalysis" }
   | { readonly type: "analysisFinished"; readonly analysis: AnalysisState }
   | { readonly type: "setView"; readonly view: ViewState }
@@ -225,6 +260,12 @@ export const INITIAL_STATE: ReducerState = {
   plotSummary: null,
   plotName: t.browser.plotName,
   focus: false,
+  planting: null,
+  priority: "soil",
+  inspectorTab: "outlook",
+  rotationStart: 0,
+  rotationSeasons: ROTATION_SEASONS.short,
+  lanesOpen: false,
   analysis: { status: "idle" },
   analysisNonce: 0,
   view: { bearing: 0, pitch: 30, zoom: 8 },
@@ -354,9 +395,37 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
         : {
             ...state,
             focus,
+            lanesOpen: false,
             panels: state.inspectorView === "results" ? { ...state.panels, inspector: false } : state.panels,
           };
     }
+    case "setPlanting":
+      // New answers start from the sheet's top choice again.
+      return { ...state, planting: action.planting, rotationStart: 0, lanesOpen: action.planting !== null && state.lanesOpen };
+    case "setPriority":
+      // A priority can reorder the first season's options, so the pick by position starts over.
+      return { ...state, priority: action.priority, rotationStart: 0 };
+    case "setInspectorTab":
+      return { ...state, inspectorTab: action.tab, lanesOpen: action.tab === "rotation" && state.lanesOpen };
+    case "setRotationStart":
+      return { ...state, rotationStart: action.start };
+    case "setRotationSeasons":
+      return { ...state, rotationSeasons: action.seasons };
+    case "setLanesOpen":
+      // The lanes take the timeline's place, and the timeline holds the pause button.
+      return { ...state, lanesOpen: action.open, precipPlaying: action.open ? false : state.precipPlaying };
+    case "restoreSaved":
+      return state.plot
+        ? state
+        : {
+            ...state,
+            plot: action.plot,
+            plotSummary: summarizePlot(action.plot),
+            plotName: action.plotName.trim().slice(0, PLOT_NAME_MAX) || t.browser.plotName,
+            planting: action.planting,
+            priority: action.priority,
+            analysis: { status: "running" },
+          };
     case "clearPlot":
       return {
         ...state,
@@ -365,6 +434,12 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
         tool: state.tool === "edit" ? "pan" : state.tool,
         plot: null,
         plotSummary: null,
+        // The farmer's answers were about that plot.
+        planting: null,
+        rotationStart: 0,
+        rotationSeasons: ROTATION_SEASONS.short,
+        lanesOpen: false,
+        inspectorTab: "outlook",
         analysis: { status: "idle" },
         // Without results (and with Display closed) the Inspector disappears; so does its drawer.
         panels: state.inspectorView === "results" ? { ...state.panels, inspector: false } : state.panels,
@@ -417,6 +492,19 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
  */
 export function inspectorVisible(state: Pick<WorkspaceState, "inspectorView" | "focus">): boolean {
   return state.inspectorView === "display" || state.focus;
+}
+
+/** The plan lanes show while the plot's rotation is on screen: in focus, with the farmer's answers. */
+export function lanesVisible(
+  state: Pick<WorkspaceState, "lanesOpen" | "focus" | "inspectorView" | "inspectorTab" | "planting">,
+): boolean {
+  return (
+    state.lanesOpen &&
+    state.focus &&
+    state.inspectorView === "results" &&
+    state.inspectorTab === "rotation" &&
+    state.planting !== null
+  );
 }
 
 /** lg and up: whether the left flyout is open beside the tool rail (it takes map room there). */
@@ -473,7 +561,24 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   const get = useCallback(() => controllerRef.current, []);
   const registry = useMemo(() => ({ register, get }), [register, get]);
 
-  const { plot, analysisNonce } = state;
+  // The plot, its name and the farmer's answers survive a reload. Restored after mount (the page is
+  // prerendered without them), then saved on every change and forgotten when the plot is deleted.
+  const { plot, plotName, planting, priority, analysisNonce } = state;
+  const hadPlot = useRef(false);
+  useEffect(() => {
+    const saved = readSavedPlot();
+    if (saved) dispatch({ type: "restoreSaved", ...saved });
+  }, []);
+  useEffect(() => {
+    if (plot) {
+      hadPlot.current = true;
+      writeSavedPlot({ plot, plotName, planting, priority });
+    } else if (hadPlot.current) {
+      hadPlot.current = false;
+      writeSavedPlot(null);
+    }
+  }, [plot, plotName, planting, priority]);
+
   const plotClimate = usePlotClimate(state.plotSummary?.centroid ?? null);
   useEffect(() => {
     // The outlook waits for the plot's NASA climate; if that request fails it falls back to the
@@ -493,9 +598,10 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   const layerData = useLayerQuery(scoring ? null : state.activeLayer, range);
   const layerDataB = useLayerQuery(isTwoLayerMode(state.viewMode) ? state.secondLayer : null, range);
   const scoreData = useScoreData(scoring, state.scoreCrop);
+  const plotRain = plotClimate.status === "ready" ? plotClimate.monthlyRain : null;
   const value = useMemo<WorkspaceState>(
-    () => ({ ...state, layerData, layerDataB, scoreData }),
-    [state, layerData, layerDataB, scoreData],
+    () => ({ ...state, layerData, layerDataB, scoreData, plotRain }),
+    [state, layerData, layerDataB, scoreData, plotRain],
   );
 
   const { precipPlaying, precipSpeed } = state;
@@ -611,7 +717,12 @@ function useScoreData(enabled: boolean, crop: CropId): ScoreState {
 /** The plot's climate over the last 12 months, from NASA POWER. */
 type PlotClimate =
   | { readonly status: "none" | "loading" | "error" }
-  | { readonly status: "ready"; readonly measured: Partial<Record<FactorId, number>> };
+  | {
+      readonly status: "ready";
+      readonly measured: Partial<Record<FactorId, number>>;
+      /** Rainfall per calendar month over the same 12 months (the rotation's season axis). */
+      readonly monthlyRain: readonly number[] | null;
+    };
 
 /** Plot centres are rounded to ~5 km: POWER's cells are ~55 km, so small edits reuse the answer. */
 function roundForClimate(value: number): number {
@@ -656,7 +767,9 @@ function usePlotClimate(center: readonly [number, number] | null): PlotClimate {
       if (humidity.days > 0) measured.humidity = humidity.sum / humidity.days;
       const temp = totals(series[TEMP_PARAMETER]);
       if (temp.days > 0) measured.temp = temp.sum / temp.days;
-      return Object.keys(measured).length > 0 ? { status: "ready", measured } : { status: "error" };
+      return Object.keys(measured).length > 0
+        ? { status: "ready", measured, monthlyRain: monthlyTotals(series[PRECIP_PARAMETER]) }
+        : { status: "error" };
     }
     return isError ? { status: "error" } : { status: "loading" };
   }, [lng, data, isError]);

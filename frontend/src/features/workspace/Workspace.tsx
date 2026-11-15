@@ -5,6 +5,7 @@ import { QueryProvider } from "@/lib/query";
 import { useEffect, useRef, type ReactNode } from "react";
 import { NavBar } from "./chrome/NavBar";
 import { PlotUndoToast } from "./chrome/PlotUndoToast";
+import { RotationLanes } from "./chrome/RotationLanes";
 import { TimelineDock } from "./chrome/TimelineDock";
 import { Ribbon } from "./chrome/Ribbon";
 import { ToolRail } from "./chrome/ToolRail";
@@ -13,7 +14,7 @@ import { DRAWER_QUERY, useMediaQuery } from "./hooks/useMediaQuery";
 import { AnalysisAnnouncer } from "./panels/AnalysisAnnouncer";
 import { BrowserPanel } from "./panels/BrowserPanel";
 import { InspectorPanel } from "./panels/InspectorPanel";
-import { WorkspaceProvider, inspectorVisible, useWorkspace, useWorkspaceDispatch, type PanelId } from "./store";
+import { WorkspaceProvider, inspectorVisible, lanesVisible, useWorkspace, useWorkspaceDispatch, type PanelId } from "./store";
 import { t } from "./strings";
 
 /** MapLibre/deck.gl touch `window`, so the map is client-only and code-split. */
@@ -64,7 +65,8 @@ function Canvas() {
         className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center px-4"
       >
         <PlotUndoToast />
-        {display.timeline ? <TimelineDock /> : null}
+        {/* The plan lanes take the timeline's place while they are open. */}
+        {lanesVisible(state) ? <RotationLanes /> : display.timeline ? <TimelineDock /> : null}
         {display.navBar ? <NavBar /> : null}
       </div>
     </main>
@@ -127,6 +129,8 @@ function Drawers({ drawerLayout }: { readonly drawerLayout: boolean }) {
  * returns focus to its top-bar toggle unless an in-panel action already moved focus elsewhere.
  * The dock always spans the full height and lets clicks through; the panel inside grows into it
  * and slides down to its header when collapsed (see `Panel`), so the map stays usable below it.
+ * On a phone (below sm) the right dock is a bottom sheet instead of a side drawer, so the plot stays
+ * in view above the results.
  */
 function Dock({
   side,
@@ -167,14 +171,17 @@ function Dock({
   const width = side === "left" ? "w-[var(--tl-browser-w)]" : "w-[var(--tl-inspector-w)]";
   // The left panel is the tool rail's flyout: at lg it sits beside the rail (12px inset, 8px gap).
   const position = side === "left" ? "left-0 lg:left-[calc(var(--tl-rail-w)+1.25rem)]" : "right-0 lg:right-3";
-  const hidden = side === "left" ? "max-lg:-translate-x-full" : "max-lg:translate-x-full";
+  const hidden =
+    side === "left" ? "max-lg:-translate-x-full" : "max-lg:translate-x-full max-sm:translate-x-0 max-sm:translate-y-full";
+  const sheet =
+    side === "right" ? "max-sm:inset-x-0 max-sm:top-auto max-sm:h-[72dvh] max-sm:w-full max-sm:max-w-none" : "";
   return (
     <div
       ref={ref}
       id={`dock-${panel}`}
       className={`pointer-events-none absolute inset-y-0 z-20 flex max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 ease-out lg:bottom-3 lg:top-3 ${width} ${position} ${
         open ? "max-lg:translate-x-0" : `${hidden} max-lg:invisible`
-      } ${closedAtLg ? "lg:hidden" : ""}`}
+      } ${sheet} ${closedAtLg ? "lg:hidden" : ""}`}
     >
       {children}
     </div>
