@@ -118,7 +118,6 @@ function TwoLayerControls({ mode }: { readonly mode: TwoLayerMode }) {
           </>
         )
       ) : null}
-      <p className="text-[11px] leading-snug text-muted">{t.browser.precip.resolution}</p>
     </div>
   );
 }

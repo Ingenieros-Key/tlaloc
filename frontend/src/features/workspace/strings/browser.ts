@@ -73,7 +73,6 @@ export const browser = {
     loading: "Loading NASA POWER data…",
     error: "Couldn't load NASA POWER data.",
     retry: "Retry",
-    resolution: "NASA POWER data comes on a ~55 km grid; the map smooths it between grid points.",
     day: "Day",
     loadingRange: "Loading timeframe…",
     modeLabel: "What to show",

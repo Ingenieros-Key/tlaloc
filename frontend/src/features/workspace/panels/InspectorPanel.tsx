@@ -13,7 +13,7 @@ import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
 
 /**
  * Right "Inspector" panel: the open toolbox (Display), or plot facts and the per-crop planting
- * outlook for the drawn area. Not rendered when it has neither (see `inspectorVisible`).
+ * outlook for the plot in focus. Not rendered when it has neither (see `inspectorVisible`).
  */
 export function InspectorPanel() {
   const { plotSummary, plotName, analysis, inspectorView } = useWorkspace();

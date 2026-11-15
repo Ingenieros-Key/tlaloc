@@ -120,9 +120,6 @@ export function LayerRow({ id }: { readonly id: LayerId }) {
               onChange={(style) => dispatch({ type: "setDataStyle", style })}
             />
             {display.legends ? <Legend layer={layer} range={settings.range} /> : null}
-            {live && layerData.status === "ready" ? (
-              <p className="text-[11px] leading-snug text-muted">{t.browser.precip.resolution}</p>
-            ) : null}
             {/* Display options: opacity and the value filter, folded away by default. */}
             <div className="border-t border-line pt-1">
               <button

@@ -121,7 +121,10 @@ export type WorkspaceState = {
   readonly plotSummary: PlotSummary | null;
   /** What the user calls the drawn area; shown in the Browser, the Inspector and on the map. */
   readonly plotName: string;
-  /** Focus plot: data clipped to the plot, the rest of the map dimmed, the value shown on it. */
+  /**
+   * Focus plot: data clipped to the plot, the rest of the map dimmed, the value shown on it, and
+   * the plot's results in the Inspector (see `inspectorVisible`).
+   */
   readonly focus: boolean;
   readonly analysis: AnalysisState;
   /** Bumped by "Analyze" to force a re-run on the same plot. */
@@ -333,17 +336,27 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
         plot: action.plot,
         plotSummary: summarizePlot(action.plot),
         analysis: { status: "running" },
-        // A new plot produces results, so bring them into view.
-        collapsed: { ...state.collapsed, inspector: false },
-        inspectorView: "results",
+        // A plot in focus has its results on screen: bring the fresh ones into view. Out of focus
+        // the Inspector stays as it is (a new plot is put in focus by whoever drew it).
+        ...(state.focus ? { collapsed: { ...state.collapsed, inspector: false }, inspectorView: "results" as const } : {}),
       };
     case "setPlotName": {
       // A blank name falls back to the default rather than leaving the plot unlabelled.
       const name = action.name.trim().slice(0, PLOT_NAME_MAX);
       return { ...state, plotName: name || t.browser.plotName };
     }
-    case "setFocus":
-      return { ...state, focus: action.focus && state.plot !== null };
+    case "setFocus": {
+      const focus = action.focus && state.plot !== null;
+      if (focus === state.focus) return state;
+      // Focus brings the plot's results up with it; leaving focus takes them (and their drawer) away.
+      return focus
+        ? { ...state, focus, collapsed: { ...state.collapsed, inspector: false }, inspectorView: "results" }
+        : {
+            ...state,
+            focus,
+            panels: state.inspectorView === "results" ? { ...state.panels, inspector: false } : state.panels,
+          };
+    }
     case "clearPlot":
       return {
         ...state,
@@ -374,13 +387,13 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
       return { ...state, pin: action.pin };
     case "setInspectorView":
       // Switching what the card shows also unfolds it if it was collapsed. Closing Display with no
-      // plot leaves nothing to show, so the Inspector (and its drawer) goes away.
+      // plot in focus leaves nothing to show, so the Inspector (and its drawer) goes away.
       return {
         ...state,
         inspectorView: action.view,
         collapsed: { ...state.collapsed, inspector: false },
         panels:
-          action.view === "results" && !state.plotSummary ? { ...state.panels, inspector: false } : state.panels,
+          action.view === "results" && !state.focus ? { ...state.panels, inspector: false } : state.panels,
       };
     case "setDisplay":
       return {
@@ -399,10 +412,11 @@ export function workspaceReducer(state: ReducerState, action: WorkspaceAction): 
 
 /**
  * The Inspector only appears when it has something to show: an open toolbox (Display, for now) or
- * the results for a drawn plot. Its empty "draw a plot" state repeated the Area tool, so it is gone.
+ * the results for the plot in focus. A plot out of focus is just a shape on the map; its results
+ * come back with focus. (`focus` is only ever true while a plot exists.)
  */
-export function inspectorVisible(state: Pick<WorkspaceState, "inspectorView" | "plotSummary">): boolean {
-  return state.inspectorView === "display" || state.plotSummary !== null;
+export function inspectorVisible(state: Pick<WorkspaceState, "inspectorView" | "focus">): boolean {
+  return state.inspectorView === "display" || state.focus;
 }
 
 /** lg and up: whether the left flyout is open beside the tool rail (it takes map room there). */
