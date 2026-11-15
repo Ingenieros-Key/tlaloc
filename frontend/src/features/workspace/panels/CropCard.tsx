@@ -92,7 +92,17 @@ function FactorRow({ factor }: { readonly factor: FactorScore }) {
   return (
     <li>
       <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="truncate text-muted">{name}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-muted">{name}</span>
+          {factor.source === "nasa" ? (
+            <span
+              title={t.inspector.nasaSourceHint}
+              className="shrink-0 rounded px-1 text-[11px] font-medium leading-4 text-accent ring-1 ring-inset ring-accent/40"
+            >
+              {t.inspector.nasaSource}
+            </span>
+          ) : null}
+        </span>
         <span className="shrink-0 whitespace-nowrap">
           <span className="font-mono text-text tabular">{formatWithUnit(LAYERS[factor.layer], factor.value)}</span>
           <span className={`ml-1.5 font-medium ${factor.position === "within" ? "text-good" : "text-fair"}`}>

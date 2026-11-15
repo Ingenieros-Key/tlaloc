@@ -5,7 +5,8 @@ export const common = {
   appName: "Tlaloc",
   sampleData: "Sample data",
   sampleDataHint:
-    "The precipitation layer is live NASA POWER data. Crop outlook scores still use simulated humidity, rainfall and soil values for demonstration.",
+    "Rainfall in the crop outlook is NASA POWER data: the last 12 months at your plot (marked NASA). Humidity and soil condition are still simulated for demonstration.",
+  partlySample: "Partly sample",
   layers: {
     humidity: "Humidity",
     rain: "Rainfall",

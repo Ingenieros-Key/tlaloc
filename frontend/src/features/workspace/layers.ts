@@ -76,7 +76,7 @@ export function defaultLayerSettings(layer: LayerId): LayerSettings {
 }
 
 /** Color for cells whose value falls outside the user's range filter. */
-export const MUTED_CELL: Rgba = [154, 163, 199, 28];
+export const MUTED_CELL: Rgba = [158, 176, 204, 28];
 
 /** Linear interpolation across a layer ramp. `value` is clamped to the domain. */
 export function rampColor(layer: LayerDef, value: number): Rgba {

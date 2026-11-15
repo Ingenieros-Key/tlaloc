@@ -1,8 +1,7 @@
 "use client";
 
-import { MapPinOff, SquareDashed } from "lucide-react";
+import { MapPinOff } from "lucide-react";
 import type { ReactNode } from "react";
-import { focusMapCanvas } from "../map/focus";
 import { usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
 import { SampleDataNotice } from "../chrome/SampleDataNotice";
 import { t } from "../strings";
@@ -12,16 +11,32 @@ import { CropCard } from "./CropCard";
 import { DisplayPanel } from "./DisplayPanel";
 import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
 
-/** Right "Inspector" panel: plot facts and the per-crop planting outlook for the drawn square. */
+/**
+ * Right "Inspector" panel: the open toolbox (Display), or plot facts and the per-crop planting
+ * outlook for the drawn area. Not rendered when it has neither (see `inspectorVisible`).
+ */
 export function InspectorPanel() {
-  const { plotSummary, analysis, inspectorView } = useWorkspace();
+  const { plotSummary, plotName, analysis, inspectorView } = useWorkspace();
+  const dispatch = useWorkspaceDispatch();
   const showDisplay = inspectorView === "display";
   const title = showDisplay ? t.inspector.display.title : t.inspector.title;
   const collapse = usePanelCollapse("inspector", title);
 
   if (showDisplay) {
     return (
-      <Panel title={title} labelledBy="inspector-title" collapse={collapse}>
+      <Panel
+        title={title}
+        labelledBy="inspector-title"
+        collapse={collapse}
+        close={{
+          label: t.inspector.display.close,
+          onClose: () => {
+            dispatch({ type: "setInspectorView", view: "results" });
+            // The card may disappear with it; hand focus back to the button that opened it.
+            document.querySelector<HTMLElement>('[data-roving="display"]')?.focus();
+          },
+        }}
+      >
         <DisplayPanel />
       </Panel>
     );
@@ -34,8 +49,8 @@ export function InspectorPanel() {
       collapse={collapse}
     >
       <div className="divide-y divide-line">
-        <Section id="inspector-plot" heading={t.inspector.plotHeading}>
-          {plotSummary ? <PlotFacts summary={plotSummary} analysis={analysis} /> : <EmptyPlot />}
+        <Section id="inspector-plot" heading={plotName}>
+          {plotSummary ? <PlotFacts summary={plotSummary} analysis={analysis} /> : null}
         </Section>
         {plotSummary ? (
           <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<SampleDataNotice align="end" />}>
@@ -70,27 +85,6 @@ function Section({
       </div>
       {children}
     </section>
-  );
-}
-
-function EmptyPlot() {
-  const dispatch = useWorkspaceDispatch();
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong px-4 py-6 text-center">
-      <SquareDashed aria-hidden="true" strokeWidth={1.5} className="size-8 text-muted" />
-      <p className="text-[13px] text-muted">{t.inspector.emptyPlot}</p>
-      <button
-        type="button"
-        onClick={() => {
-          dispatch({ type: "setTool", tool: "square" });
-          dispatch({ type: "setPanel", panel: "inspector", open: false });
-          focusMapCanvas();
-        }}
-        className="inline-flex h-10 cursor-pointer items-center rounded-md bg-accent px-4 text-[13px] font-semibold text-on-accent transition-colors duration-150 hover:bg-accent/85"
-      >
-        {t.inspector.drawSquare}
-      </button>
-    </div>
   );
 }
 

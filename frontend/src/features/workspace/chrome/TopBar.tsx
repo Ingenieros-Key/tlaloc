@@ -3,7 +3,7 @@
 import { Menu, PanelLeft, PanelRight, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { t } from "../strings";
-import { useWorkspace, useWorkspaceDispatch, type PanelId } from "../store";
+import { inspectorVisible, useWorkspace, useWorkspaceDispatch, type PanelId } from "../store";
 import { IconButton } from "../ui/IconButton";
 import { Brand } from "@/components/ui/brand";
 import { NavLinks } from "@/components/ui/nav-links";
@@ -29,7 +29,7 @@ export function TopBar() {
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div className="flex items-center lg:hidden">
           <DrawerToggle panel="browser" other="inspector" icon={PanelLeft} label={s.openLayers} />
-          <DrawerToggle panel="inspector" other="browser" icon={PanelRight} label={s.openResults} />
+          <InspectorToggle />
           <SiteMenu />
         </div>
         <div className="max-lg:hidden">
@@ -38,6 +38,13 @@ export function TopBar() {
       </div>
     </header>
   );
+}
+
+/** The Results drawer toggle, shown only while the Inspector has something to show. */
+function InspectorToggle() {
+  const state = useWorkspace();
+  if (!inspectorVisible(state)) return null;
+  return <DrawerToggle panel="inspector" other="browser" icon={PanelRight} label={s.openResults} />;
 }
 
 function DrawerToggle({
