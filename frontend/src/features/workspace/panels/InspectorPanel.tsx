@@ -2,21 +2,24 @@
 
 import { MapPinOff } from "lucide-react";
 import type { ReactNode } from "react";
-import { usePanelCollapse, useWorkspace, useWorkspaceDispatch } from "../store";
+import { usePanelCollapse, useWorkspace, useWorkspaceDispatch, type InspectorTab } from "../store";
 import { SampleDataNotice } from "../chrome/SampleDataNotice";
 import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
+import { Segmented } from "../ui/Segmented";
 import { CropCard } from "./CropCard";
 import { DisplayPanel } from "./DisplayPanel";
 import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
+import { RotationTab } from "./RotationTab";
 
 /**
- * Right "Inspector" panel: the open toolbox (Display), or plot facts and the per-crop planting
- * outlook for the plot in focus. Not rendered when it has neither (see `inspectorVisible`).
+ * Right "Inspector" panel: the open toolbox (Display), or the plot in focus: its facts, then either
+ * the per-crop planting outlook or the rotation (two tabs). Not rendered when it has neither (see
+ * `inspectorVisible`).
  */
 export function InspectorPanel() {
-  const { plotSummary, plotName, analysis, inspectorView } = useWorkspace();
+  const { plotSummary, plotName, analysis, inspectorView, inspectorTab } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const showDisplay = inspectorView === "display";
   const title = showDisplay ? t.inspector.display.title : t.inspector.title;
@@ -53,9 +56,26 @@ export function InspectorPanel() {
           {plotSummary ? <PlotFacts summary={plotSummary} analysis={analysis} /> : null}
         </Section>
         {plotSummary ? (
-          <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<SampleDataNotice align="end" />}>
-            <Outlook analysis={analysis} />
-          </Section>
+          <div>
+            <div className="px-3 pt-3">
+              <Segmented<InspectorTab>
+                label={t.rotation.tabs.label}
+                value={inspectorTab}
+                options={[
+                  { value: "outlook", label: t.rotation.tabs.outlook },
+                  { value: "rotation", label: t.rotation.tabs.rotation },
+                ]}
+                onChange={(tab) => dispatch({ type: "setInspectorTab", tab })}
+              />
+            </div>
+            {inspectorTab === "rotation" ? (
+              <RotationTab />
+            ) : (
+              <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<SampleDataNotice align="end" />}>
+                <Outlook analysis={analysis} />
+              </Section>
+            )}
+          </div>
         ) : null}
       </div>
     </Panel>

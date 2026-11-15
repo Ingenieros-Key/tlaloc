@@ -210,7 +210,11 @@ function ScoreControls() {
       <Segmented<CropId>
         label={s.crop}
         value={scoreCrop}
-        options={CROP_ORDER.map((crop) => ({ value: crop, label: t.common.crops[crop] }))}
+        options={CROP_ORDER.map((crop) => ({
+          value: crop,
+          label: t.common.cropsShort[crop],
+          ariaLabel: t.common.crops[crop],
+        }))}
         onChange={(crop) => dispatch({ type: "setScoreCrop", crop })}
       />
       {scoreData.status === "loading" ? (

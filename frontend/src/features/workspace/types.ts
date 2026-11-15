@@ -100,7 +100,7 @@ export type PlotSummary = {
   readonly centroid: readonly [number, number];
 };
 
-export type CropId = "corn" | "beans" | "sorghum";
+export type CropId = "corn" | "beans" | "sorghum" | "sugarcane";
 
 export type Rating = "good" | "fair" | "poor";
 

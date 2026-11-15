@@ -1,6 +1,6 @@
 import type { CropId } from "../types";
 
-/** Line icons for the three crops, drawn in currentColor so they take the rating color. */
+/** Line icons for the outlook crops, drawn in currentColor so they take the rating color. */
 export function CropIcon({ crop, className = "" }: { readonly crop: CropId; readonly className?: string }) {
   return (
     <svg
@@ -25,6 +25,13 @@ export function CropIcon({ crop, className = "" }: { readonly crop: CropId; read
           {/* Two beans side by side. */}
           <path d="M8.5 4.5c2.5 0 3.5 2 2.8 4.2-.5 1.6-.2 2.8.6 4.2 1.2 2.2-.2 5.6-3.4 5.6S4 15.8 4 11.5 5.6 4.5 8.5 4.5z" />
           <path d="M16 6c2.6 0 4 2.6 4 6s-1.4 6-4 6c-2 0-3.2-1.6-2.8-3.4.3-1.2 1-2 1-3.4 0-1.6-1.4-2.4-1-3.6.3-.9 1.4-1.6 2.8-1.6z" />
+        </>
+      ) : crop === "sugarcane" ? (
+        <>
+          {/* Sugarcane: a jointed stalk with two long leaves. */}
+          <path d="M11 21V5M14 21V8" />
+          <path d="M11 9h3M11 13h3M11 17h3" />
+          <path d="M11 5c-.5-1.5-2.5-2.5-5-2.5M14 8c1-2 3-3 5.5-3" />
         </>
       ) : (
         <>

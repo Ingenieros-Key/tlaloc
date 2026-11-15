@@ -25,6 +25,14 @@ export const common = {
     corn: "Corn",
     beans: "Beans",
     sorghum: "Sorghum",
+    sugarcane: "Sugarcane",
+  } satisfies Record<CropId, string>,
+  /** For controls too narrow for the full name; the full one is still announced. */
+  cropsShort: {
+    corn: "Corn",
+    beans: "Beans",
+    sorghum: "Sorghum",
+    sugarcane: "Cane",
   } satisfies Record<CropId, string>,
   ratings: {
     good: "Good",
