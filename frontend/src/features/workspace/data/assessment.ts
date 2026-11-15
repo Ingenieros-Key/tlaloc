@@ -1,27 +1,28 @@
 import { bbox, booleanPointInPolygon, centroid } from "@turf/turf";
-import { FACTOR_ORDER, LAYERS, SAMPLE_LAYER_ORDER } from "../layers";
 import type { Position } from "geojson";
+import { FACTOR_ORDER } from "../layers";
 import type {
-  CropId,
-  FactorId,
-  FactorSource,
   Assessment,
   CropAssessment,
+  CropId,
+  FactorId,
   FactorScore,
   GridCell,
   PlotFeature,
   Rating,
 } from "../types";
-import { CROPS, CROP_ORDER, FACTOR_TOLERANCE, RATING_THRESHOLDS, type CropProfile } from "./crops";
+import { CROP_ORDER, RATING_THRESHOLDS } from "./crops";
+import { CROP_MODELS, optimumPosition, viability } from "./viability";
 
-function sampleCells(plot: PlotFeature, grid: readonly GridCell[]): readonly GridCell[] {
+/** Indexes of the grid cells whose centres fall inside the plot, else the one under its centre. */
+function sampleCells(plot: PlotFeature, grid: readonly GridCell[]): readonly number[] {
   const [minX, minY, maxX, maxY] = bbox(plot);
-  const inside = grid.filter(({ center: [lng, lat] }) => {
-    if (lng < minX || lng > maxX || lat < minY || lat > maxY) return false;
-    return booleanPointInPolygon([lng, lat], plot);
+  const inside: number[] = [];
+  grid.forEach(({ center: [lng, lat] }, i) => {
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) return;
+    if (booleanPointInPolygon([lng, lat], plot)) inside.push(i);
   });
   if (inside.length > 0) return inside;
-
   return cellUnder(centroid(plot).geometry.coordinates, grid);
 }
 
@@ -29,8 +30,8 @@ function sampleCells(plot: PlotFeature, grid: readonly GridCell[]): readonly Gri
  * The drawn hexagon containing a point, so a plot smaller than a cell reads the cell it visibly sits
  * on (and a plot off the drawn grid is reported as outside the coverage).
  */
-function cellUnder([lng, lat]: Position, grid: readonly GridCell[]): readonly GridCell[] {
-  const hit = grid.find(({ polygon }) => {
+function cellUnder([lng, lat]: Position, grid: readonly GridCell[]): readonly number[] {
+  const hit = grid.findIndex(({ polygon }) => {
     const xs = polygon.map(([x]) => x);
     const ys = polygon.map(([, y]) => y);
     if (lng < Math.min(...xs) || lng > Math.max(...xs) || lat < Math.min(...ys) || lat > Math.max(...ys)) {
@@ -41,23 +42,7 @@ function cellUnder([lng, lat]: Position, grid: readonly GridCell[]): readonly Gr
       coordinates: [polygon.map(([x, y]) => [x, y])],
     });
   });
-  return hit ? [hit] : [];
-}
-
-function scoreFactor(
-  layer: FactorId,
-  value: number,
-  crop: CropProfile,
-  source: FactorSource,
-): FactorScore {
-  const [lo, hi] = crop.ideal[layer];
-  const [dMin, dMax] = LAYERS[layer].domain;
-  const tolerance = (dMax - dMin) * FACTOR_TOLERANCE;
-  const position = value < lo ? "below" : value > hi ? "above" : "within";
-  const gap = position === "below" ? lo - value : position === "above" ? value - hi : 0;
-  const score =
-    position === "within" ? 100 : Math.min(99, Math.round(100 * Math.max(0, 1 - gap / tolerance)));
-  return { layer, value, score, position, source };
+  return hit >= 0 ? [hit] : [];
 }
 
 function rate(score: number): Rating {
@@ -66,65 +51,54 @@ function rate(score: number): Rating {
   return "poor";
 }
 
-function assessCrop(
-  crop: CropProfile,
-  values: Readonly<Partial<Record<FactorId, number>>>,
-  sources: Readonly<Partial<Record<FactorId, FactorSource>>>,
-): CropAssessment {
-  const present = FACTOR_ORDER.filter((id) => values[id] !== undefined);
-  const factors = present.map((id) => scoreFactor(id, values[id] as number, crop, sources[id] ?? "sample"));
-  // Weights are renormalised over the factors that have a value (temperature has no sample fallback).
-  const weightSum = present.reduce((sum, id) => sum + crop.weights[id], 0);
-  const weighted = factors.reduce((sum, f) => sum + (f.score * crop.weights[f.layer]) / weightSum, 0);
+/**
+ * One crop's outlook from the viability model (the Crop score view runs this for every cell).
+ * Null when a value is missing: the model needs all four.
+ */
+export function scoreCrop(crop: CropId, values: Readonly<Partial<Record<FactorId, number>>>): CropAssessment | null {
+  const { index, aptitudes } = viability(crop, values);
+  if (index === null) return null;
+  const curves = CROP_MODELS[crop].curves;
+  const factors = FACTOR_ORDER.map(
+    (id): FactorScore => ({
+      layer: id,
+      value: values[id] as number,
+      score: aptitudes[id] * 100,
+      position: optimumPosition(values[id] as number, curves[id]),
+      source: "nasa",
+    }),
+  );
   const lowest = factors.reduce((min, f) => (f.score < min.score ? f : min));
+  // A crop held back by any factor never rounds up to a perfect 100.
   const ceiling = lowest.score < 100 ? 99 : 100;
-  const score = Math.max(0, Math.min(ceiling, Math.round(weighted)));
-  return {
-    crop: crop.id,
-    score,
-    rating: rate(score),
-    factors,
-    limiting: lowest.score < 100 ? lowest.layer : null,
-  };
-}
-
-/** One crop's outlook from factor values (the Crop score view runs this for every cell). */
-export function scoreCrop(
-  crop: CropId,
-  values: Readonly<Partial<Record<FactorId, number>>>,
-  sources: Readonly<Partial<Record<FactorId, FactorSource>>> = {},
-): CropAssessment {
-  return assessCrop(CROPS[crop], values, sources);
+  const score = Math.max(0, Math.min(ceiling, Math.round(index)));
+  return { crop, score, rating: rate(score), factors, limiting: lowest.score < 100 ? lowest.layer : null };
 }
 
 /**
- * Scores each crop for the plot from the mean values of the grid cells it covers. `measured`
- * replaces sample values with NASA POWER ones where available (temperature, humidity, rainfall).
+ * Scores each crop for the plot. Temperature, rainfall and humidity are NASA POWER's 12-month
+ * values at the plot; elevation is the mean of the elevation hexagons the plot covers (NASA SRTM).
  */
 export function computeAssessment(
   plot: PlotFeature,
   grid: readonly GridCell[],
-  measured: Partial<Record<FactorId, number>> = {},
+  climate: Readonly<Partial<Record<Exclude<FactorId, "elevation">, number>>>,
+  elevation: Float32Array | null,
 ): Assessment {
   const cells = sampleCells(plot, grid);
   if (cells.length === 0) return { kind: "outside" };
 
-  const values: Partial<Record<FactorId, number>> = {};
-  const sources: Partial<Record<FactorId, FactorSource>> = {};
-  for (const layer of SAMPLE_LAYER_ORDER) {
-    values[layer] = cells.reduce((sum, cell) => sum + cell.values[layer], 0) / cells.length;
-    sources[layer] = "sample";
+  const values: Partial<Record<FactorId, number>> = { ...climate };
+  if (elevation) {
+    const heights = cells.map((i) => elevation[i]).filter((h) => Number.isFinite(h));
+    if (heights.length > 0) values.elevation = heights.reduce((sum, h) => sum + h, 0) / heights.length;
   }
-  for (const id of FACTOR_ORDER) {
-    const value = measured[id];
-    if (value === undefined) continue;
-    values[id] = value;
-    sources[id] = "nasa";
-  }
+  const missing = FACTOR_ORDER.filter((id) => values[id] === undefined || !Number.isFinite(values[id]));
+  if (missing.length > 0) return { kind: "missing", missing };
 
   return {
     kind: "ok",
     cellsSampled: cells.length,
-    crops: CROP_ORDER.map((id) => assessCrop(CROPS[id], values, sources)),
+    crops: CROP_ORDER.map((id) => scoreCrop(id, values)).filter((c): c is CropAssessment => c !== null),
   };
 }

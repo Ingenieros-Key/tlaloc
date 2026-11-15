@@ -1,4 +1,4 @@
-import type { DisplayKey } from "../types";
+import type { DisplayKey, FactorId } from "../types";
 
 /** UI strings for the inspector area. Owned by the inspector module; add keys freely. */
 export const inspector = {
@@ -19,10 +19,18 @@ export const inspector = {
   coordinate: (degrees: string, hemisphere: string) => `${degrees}° ${hemisphere}`,
   withUnit: (value: string, unit: string) => `${value} ${unit}`,
   nasaSource: "NASA",
-  nasaSourceHint: "Measured: NASA POWER rainfall over the last 12 months at this plot",
+  /** Where each factor's value comes from, on its NASA badge. */
+  sourceHints: {
+    rain: "NASA POWER: total rainfall over the last 12 months at this plot",
+    temp: "NASA POWER: mean air temperature over the last 12 months at this plot",
+    humidity: "NASA POWER: mean relative humidity over the last 12 months at this plot",
+    elevation: "NASA SRTM: mean height of the hexagons this plot covers",
+  } satisfies Record<FactorId, string>,
   outlookHeading: "Planting outlook",
   loadingOutlook: "Analyzing plot",
-  outside: "This plot is outside the sample coverage. Draw inside El Salvador's outline.",
+  outside: "This plot is outside the data coverage. Draw inside El Salvador's outline.",
+  missing: (factors: string) =>
+    `Not enough NASA data to score this plot: no ${factors}. Try Analyze again in a moment.`,
   bestMatch: "Best match",
   outOf100: "/100",
   scoreLabel: (score: number) => `Score ${score} out of 100`,
@@ -44,7 +52,8 @@ export const inspector = {
   /** Several names when crops tie for the top score. */
   announceDone: (crops: readonly string[], rating: string, score: number) =>
     `Analysis complete. ${crops.length > 1 ? "Best matches" : "Best match"}: ${new Intl.ListFormat("en-US").format(crops)}, ${rating}, ${score} of 100.`,
-  announceOutside: "Analysis complete. This plot is outside the sample coverage.",
+  announceOutside: "Analysis complete. This plot is outside the data coverage.",
+  announceMissing: "Analysis incomplete. NASA data for this plot is missing.",
   display: {
     close: "Close Display",
     title: "Display",

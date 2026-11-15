@@ -6,11 +6,11 @@ import { t } from "../strings";
 import { Badge } from "../ui/Badge";
 
 /**
- * "Sample data" badge as a disclosure button: the explanation is reachable by click, tap and
- * keyboard (not hover-only). Closes on Escape, outside pointer-down or when focus leaves it.
- * Sits on the crop outlook, the one part of the workspace that still uses simulated values.
+ * "Exploratory model" badge as a disclosure button: what the crop scores are built from and how far
+ * their ranges are validated, reachable by click, tap and keyboard (not hover-only). Closes on
+ * Escape, outside pointer-down or when focus leaves it. Sits on the crop outlook.
  */
-export function SampleDataNotice({ align = "start" }: { readonly align?: "start" | "end" }) {
+export function ModelNotice({ align = "start" }: { readonly align?: "start" | "end" }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -54,7 +54,7 @@ export function SampleDataNotice({ align = "start" }: { readonly align?: "start"
       >
         <Badge>
           <Info aria-hidden="true" className="size-3.5" strokeWidth={2} />
-          {t.common.partlySample}
+          {t.common.modelNotice}
         </Badge>
       </button>
       <div
@@ -67,9 +67,9 @@ export function SampleDataNotice({ align = "start" }: { readonly align?: "start"
         }`}
       >
         <p id={titleId} className="text-sm font-semibold text-text">
-          {t.chrome.topBar.sampleDataTitle}
+          {t.chrome.topBar.modelNoticeTitle}
         </p>
-        <p className="mt-1 text-xs font-normal leading-relaxed text-muted">{t.common.sampleDataHint}</p>
+        <p className="mt-1 text-xs font-normal leading-relaxed text-muted">{t.common.modelNoticeHint}</p>
       </div>
     </div>
   );

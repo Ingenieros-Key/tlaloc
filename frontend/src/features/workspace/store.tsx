@@ -600,17 +600,21 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
   }, [plot, plotName, planting, priority]);
 
   const plotClimate = usePlotClimate(state.plotSummary?.centroid ?? null);
+  // Elevation for the outlook: the same cached hexagons as the elevation layer.
+  const elevation = useQuery({ ...elevationQuery(), enabled: plot !== null });
+  const elevationValues = elevation.data?.values[0] ?? null;
+  const elevationPending = plot !== null && elevation.isPending && !elevation.isError;
   useEffect(() => {
-    // The outlook waits for the plot's NASA climate; if that request fails it falls back to the
-    // sample values, and each factor says where its value came from.
-    if (!plot || plotClimate.status === "loading") return;
-    const measured = plotClimate.status === "ready" ? plotClimate.measured : {};
+    // The outlook waits for the plot's NASA climate and elevation. The viability model needs all
+    // four values, so a failed request leaves the plot unscored and says which value is missing.
+    if (!plot || plotClimate.status === "loading" || elevationPending) return;
+    const climate = plotClimate.status === "ready" ? plotClimate.measured : {};
     const timer = window.setTimeout(() => {
-      const result = computeAssessment(plot, getSampleGrid(), measured);
+      const result = computeAssessment(plot, getSampleGrid(), climate, elevationValues);
       dispatch({ type: "analysisFinished", analysis: { status: "done", result } });
     }, ANALYSIS_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [plot, analysisNonce, plotClimate]);
+  }, [plot, analysisNonce, plotClimate, elevationPending, elevationValues]);
 
   const range = state.precipMode === "latest" ? null : state.precipRange;
   const scoring = state.viewMode === "score";
@@ -721,33 +725,37 @@ const OUTLOOK_DAYS = 365;
 
 /**
  * The Crop score view: the last 12 months of rainfall, temperature and humidity over the country
- * (three regional requests, cached like any layer), reduced to one value per cell and scored for
- * `crop` with the plot outlook's rules. Changing the crop only re-scores.
+ * (three regional requests, cached like any layer) reduced to one value per cell, plus elevation,
+ * scored for `crop` with the plot outlook's viability model. Changing the crop only re-scores.
  */
 function useScoreData(enabled: boolean, crop: CropId): ScoreState {
   const [range] = useState(() => presetRange(OUTLOOK_DAYS));
   const rain = useQuery({ ...layerRegionalQuery("precip", range), enabled });
   const temp = useQuery({ ...layerRegionalQuery("temp", range), enabled });
   const humidity = useQuery({ ...layerRegionalQuery("humidity", range), enabled });
+  const elevation = useQuery({ ...elevationQuery(), enabled });
   const rainData = rain.data;
   const tempData = temp.data;
   const humidityData = humidity.data;
+  const elevationData = elevation.data;
   const climate = useMemo(
     () =>
-      enabled && rainData && tempData && humidityData
+      enabled && rainData && tempData && humidityData && elevationData
         ? {
             rain: buildLayerAggregate(rainData.data, "precip", OUTLOOK_DAYS),
             temp: buildLayerAggregate(tempData.data, "temp", OUTLOOK_DAYS),
             humidity: buildLayerAggregate(humidityData.data, "humidity", OUTLOOK_DAYS),
+            elevation: elevationData.values[0],
           }
         : null,
-    [enabled, rainData, tempData, humidityData],
+    [enabled, rainData, tempData, humidityData, elevationData],
   );
   const field = useMemo(() => (climate ? buildScoreField(climate, crop) : null), [climate, crop]);
-  const failed = rain.isError || temp.isError || humidity.isError;
+  const failed = rain.isError || temp.isError || humidity.isError || elevation.isError;
   const refetchRain = rain.refetch;
   const refetchTemp = temp.refetch;
   const refetchHumidity = humidity.refetch;
+  const refetchElevation = elevation.refetch;
   return useMemo<ScoreState>(() => {
     if (!enabled) return { status: "idle" };
     if (field) return { status: "ready", field };
@@ -758,11 +766,12 @@ function useScoreData(enabled: boolean, crop: CropId): ScoreState {
           void refetchRain();
           void refetchTemp();
           void refetchHumidity();
+          void refetchElevation();
         },
       };
     }
     return { status: "loading" };
-  }, [enabled, field, failed, refetchRain, refetchTemp, refetchHumidity]);
+  }, [enabled, field, failed, refetchRain, refetchTemp, refetchHumidity, refetchElevation]);
 }
 
 /** The plot's climate over the last 12 months, from NASA POWER. */
@@ -770,7 +779,7 @@ type PlotClimate =
   | { readonly status: "none" | "loading" | "error" }
   | {
       readonly status: "ready";
-      readonly measured: Partial<Record<FactorId, number>>;
+      readonly measured: Partial<Record<Exclude<FactorId, "elevation">, number>>;
       /** Rainfall per calendar month over the same 12 months (the rotation's season axis). */
       readonly monthlyRain: readonly number[] | null;
     };
@@ -795,8 +804,8 @@ function totals(series: Readonly<Record<string, number | null>> | undefined): { 
 /**
  * The crop outlook's measured factors at the plot, from one NASA POWER request over the last 12
  * months: rainfall (total, scaled to a full year when the newest days are not published yet),
- * relative humidity and air temperature (both means). Any parameter without data is left out, so
- * the outlook falls back to the sample value for it (or skips temperature, which has none).
+ * relative humidity and air temperature (both means). Any parameter without data is left out, and
+ * the outlook then reports it as missing (the viability model needs every value).
  */
 function usePlotClimate(center: readonly [number, number] | null): PlotClimate {
   const [range] = useState(() => presetRange(OUTLOOK_DAYS));
@@ -811,7 +820,7 @@ function usePlotClimate(center: readonly [number, number] | null): PlotClimate {
     if (lng === null) return { status: "none" };
     if (data) {
       const series = data.data.series;
-      const measured: Partial<Record<FactorId, number>> = {};
+      const measured: Partial<Record<Exclude<FactorId, "elevation">, number>> = {};
       const rain = totals(series[PRECIP_PARAMETER]);
       if (rain.days > 0) measured.rain = (rain.sum * OUTLOOK_DAYS) / rain.days;
       const humidity = totals(series[HUMIDITY_PARAMETER]);

@@ -8,7 +8,7 @@ export const chrome = {
   topBar: {
     projectLabel: "Project:",
     projectName: "Untitled plot",
-    sampleDataTitle: "About sample data",
+    modelNoticeTitle: "About these scores",
     openLayers: "Layers",
     openResults: "Results",
     signIn: "Sign in",

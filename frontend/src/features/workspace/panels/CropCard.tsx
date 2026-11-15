@@ -1,5 +1,5 @@
 import { CircleCheck, TriangleAlert } from "lucide-react";
-import { CROPS, RATING_THRESHOLDS } from "../data/crops";
+import { RATING_THRESHOLDS } from "../data/crops";
 import { LAYERS } from "../layers";
 import { useWorkspace } from "../store";
 import { t } from "../strings";
@@ -54,11 +54,6 @@ export function CropCard({
               {t.common.crops[assessment.crop]}
             </h4>
             {best ? <Badge tone="accent">{t.inspector.bestMatch}</Badge> : null}
-            {CROPS[assessment.crop].sample ? (
-              <span title={t.rotation.sampleProfileHint}>
-                <Badge>{t.rotation.sampleProfile}</Badge>
-              </span>
-            ) : null}
           </div>
           <Badge tone={assessment.rating}>{t.common.ratings[assessment.rating]}</Badge>
         </div>
@@ -101,7 +96,7 @@ function FactorRow({ factor }: { readonly factor: FactorScore }) {
           <span className="truncate text-muted">{name}</span>
           {factor.source === "nasa" ? (
             <span
-              title={t.inspector.nasaSourceHint}
+              title={t.inspector.sourceHints[factor.layer]}
               className="shrink-0 rounded px-1 text-[11px] font-medium leading-4 text-accent ring-1 ring-inset ring-accent/40"
             >
               {t.inspector.nasaSource}
