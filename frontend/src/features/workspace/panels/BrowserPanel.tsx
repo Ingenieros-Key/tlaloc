@@ -10,6 +10,7 @@ import { IconButton } from "../ui/IconButton";
 import { Panel, PanelGroup } from "../ui/Panel";
 import { formatHectares } from "./format";
 import { LayerRow } from "./LayerRow";
+import { SavedPlots } from "./SavedPlots";
 import { ViewControls } from "./ViewGroup";
 
 /**
@@ -119,6 +120,7 @@ function PlotsGroup() {
           </button>
         </div>
       )}
+      <SavedPlots />
     </div>
   );
 }

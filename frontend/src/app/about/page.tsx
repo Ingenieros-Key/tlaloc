@@ -18,23 +18,27 @@ export default function AboutPage() {
     id: StickerId;
     style: React.CSSProperties;
     node: React.ReactNode;
+    bg: string;
     tip: { title: string; body: string };
   }> = [
     {
       id: "tlaloc",
       style: { top: "-18px", left: "-18px" },
+      bg: "bg-[#0B1033]",
       node: <img src="/tlaloc-mascot.png" alt="" className="h-full w-full object-contain p-1.5" />,
       tip: t.stickers.tlaloc,
     },
     {
       id: "nasa",
       style: { top: "-18px", right: "-18px" },
-      node: <span className="font-display text-[11px] font-bold tracking-wider text-white">NASA</span>,
+      bg: "bg-white",
+      node: <img src="/nasa-logo.png" alt="" className="h-full w-full object-contain p-1" />,
       tip: t.stickers.nasa,
     },
     {
       id: "flag",
       style: { bottom: "-18px", left: "40px" },
+      bg: "bg-white",
       node: <span className="text-2xl leading-none">🇸🇻</span>,
       tip: t.stickers.flag,
     },
@@ -77,7 +81,7 @@ export default function AboutPage() {
                     animate={{ scale: 1, opacity: 1, rotate: 0 }}
                     transition={{ delay: 0.5 + i * 0.15, type: "spring", stiffness: 300, damping: 15 }}
                     whileHover={reduce ? undefined : { scale: 1.08 }}
-                    className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#0B1033] shadow-lg"
+                    className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-white shadow-lg ${st.bg}`}
                   >
                     {st.node}
                   </motion.button>
