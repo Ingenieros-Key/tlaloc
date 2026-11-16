@@ -48,6 +48,10 @@ export const inspector = {
   byYearLabel: (crop: string) => `${crop} score in each of the last years`,
   yearScore: (year: number, score: number, rating: string) => `${year}: ${score} of 100, ${rating}`,
   yearRange: (first: number, last: number) => (first === last ? `${first}` : `${first}–${last}`),
+  /** Email-reminder toggle shown next to the rotation and irrigation results. */
+  reminder: {
+    label: "Remind me by email",
+  },
   outlookHeading: "Planting outlook",
   loadingOutlook: "Analyzing plot",
   outside: "This plot is outside the data coverage. Draw inside El Salvador's outline.",

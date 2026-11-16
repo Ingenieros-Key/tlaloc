@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CognitoGuard } from '../common/auth/cognito.guard.js';
 import { CurrentUser } from '../common/auth/current-user.decorator.js';
 import * as AuthTypes from '../common/auth/types.js';
@@ -9,7 +9,7 @@ import { Plot } from './types.js';
 @Controller('plots')
 @UseGuards(CognitoGuard)
 export class PlotsController {
-  constructor(private readonly plots: PlotsService) {}
+  constructor(@Inject(PlotsService) private readonly plots: PlotsService) {}
 
   @Get()
   list(@CurrentUser() user: AuthTypes.AuthUser): Promise<readonly Plot[]> {

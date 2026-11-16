@@ -23,8 +23,10 @@ export function TopBar() {
   const named = plotSummary !== null && plotName.trim() !== "" && plotName !== t.browser.plotName;
   return (
     <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-3 border-b border-line bg-bg px-4">
-      <Brand />
-      <NavLinks className="max-lg:hidden" />
+      <div className="flex items-center gap-8">
+        <Brand />
+        <NavLinks className="max-lg:hidden" />
+      </div>
       {named && (
         <>
           <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line xl:block" />
