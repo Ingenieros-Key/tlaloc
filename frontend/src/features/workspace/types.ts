@@ -142,7 +142,13 @@ export type CropAssessment = {
 export type YearScore = { readonly year: number; readonly score: number; readonly rating: Rating };
 
 /** A month's score on its rolling 12-month climate; null when a value is missing. `month` is 1–12. */
-export type MonthScore = { readonly year: number; readonly month: number; readonly score: number | null };
+export type MonthScore = {
+  readonly year: number;
+  readonly month: number;
+  readonly score: number | null;
+  /** Scored partly on the 5-year monthly averages because the month is not measured yet. */
+  readonly projected: boolean;
+};
 
 export type Assessment =
   | { readonly kind: "ok"; readonly cellsSampled: number; readonly crops: readonly CropAssessment[] }

@@ -30,12 +30,16 @@ export const inspector = {
   monthly: {
     title: "Month by month",
     basis: "Each on its last 12 months",
-    readout: (month: string, score: string, season: string) => `${month}: ${score} · ${season}`,
+    readout: (month: string, score: string, season: string, projected: boolean) =>
+      `${month}: ${score} · ${season}${projected ? " · projected" : ""}`,
     noScore: "no score",
     range: (low: string, lowMonth: string, high: string, highMonth: string) =>
-      `Lowest ${low} (${lowMonth}), highest ${high} (${highMonth})`,
-    chartLabel: (crop: string, low: string, high: string) =>
-      `${crop} score each month, on the 12 months before it. Lowest ${low}, highest ${high}.`,
+      `Measured: lowest ${low} (${lowMonth}), highest ${high} (${highMonth})`,
+    chartLabel: (crop: string, low: string, high: string, end: string | null) =>
+      `${crop} score each month, on the 12 months before it. Lowest measured ${low}, highest ${high}.` +
+      (end ? ` Projected from the 5-year monthly averages to ${end}.` : ""),
+    projected: "Projected",
+    projectedKey: "Projected (5-year monthly averages)",
     legendLabel: "Monthly chart key",
     thresholds: "Good 70 · Fair 45",
   },

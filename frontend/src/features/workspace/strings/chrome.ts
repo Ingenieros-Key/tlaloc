@@ -98,6 +98,8 @@ export const chrome = {
     dataLayerUnavailable: "Data layer (turn a layer on to use it)",
     timeline: "Timeline",
     timelineUnavailable: "Timeline (turn a layer on to use it)",
+    plans: "Rotation plans",
+    plansUnavailable: "Rotation plans (add the plot's last planting in its Rotation tab)",
     goTo: {
       button: "Go to",
       title: "Go to",

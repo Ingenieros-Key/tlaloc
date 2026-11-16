@@ -40,6 +40,11 @@ export type ClimateYear = { readonly year: number; readonly values: Partial<Reco
 export type ClimateMonth = {
   readonly year: number;
   readonly month: number;
+  /**
+   * True for a month not measured yet (the current one and later, or one POWER has not published):
+   * its window fills every unmeasured month with that calendar month's average over the years.
+   */
+  readonly projected: boolean;
   /** Rain total, mean temperature and humidity over those 12 months; a factor missing any month is left out. */
   readonly values: Partial<Record<ClimateFactor, number>>;
 };
@@ -49,7 +54,10 @@ export type Climate = {
   readonly mean: Partial<Record<ClimateFactor, number>>;
   /** Every year with at least one value, oldest first. */
   readonly years: readonly ClimateYear[];
-  /** Every month of the averaged years, oldest first, with its rolling 12-month climate. */
+  /**
+   * Every month from the first averaged year through 11 months after the current one, oldest
+   * first, with its rolling 12-month climate (see `ClimateMonth.projected`).
+   */
   readonly months: readonly ClimateMonth[];
 };
 
@@ -63,8 +71,11 @@ function mean(values: readonly (number | null)[]): number | null {
   return valid.length > 0 ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
 }
 
-/** The climate at a point: each factor averaged over the years, plus the years themselves. */
-export function climateAt(location: PowerLocation, range: ClimateYears): Climate {
+/**
+ * The climate at a point: each factor averaged over the years, the years themselves, and the
+ * rolling months through the next 12 (`now` sets the current month).
+ */
+export function climateAt(location: PowerLocation, range: ClimateYears, now: Date = new Date()): Climate {
   const years = yearList(range)
     .map((year): ClimateYear => {
       const values: Partial<Record<ClimateFactor, number>> = {};
@@ -80,7 +91,7 @@ export function climateAt(location: PowerLocation, range: ClimateYears): Climate
     const value = mean(years.map((year) => year.values[factor] ?? null));
     if (value !== null) averages[factor] = value;
   }
-  return { mean: averages, years, months: rollingMonths(location, range) };
+  return { mean: averages, years, months: rollingMonths(location, range, now) };
 }
 
 function monthValue(location: PowerLocation, factor: ClimateFactor, year: number, month: number): number | null {
@@ -88,29 +99,44 @@ function monthValue(location: PowerLocation, factor: ClimateFactor, year: number
   return value === undefined || value === null || !Number.isFinite(value) ? null : value;
 }
 
+/** Each calendar month's average over the averaged years (index 0 = January); null = no year has it. */
+function monthlyNormals(location: PowerLocation, factor: ClimateFactor, range: ClimateYears): readonly (number | null)[] {
+  return Array.from({ length: 12 }, (_, m) => mean(yearList(range).map((year) => monthValue(location, factor, year, m + 1))));
+}
+
 /**
- * Each month of the averaged years scored the way the annual ranges expect: the rainfall total and
- * the mean temperature and humidity of the 12 months ending with it (so January 2021 reads
- * February 2020 to January 2021; the request starts a year early for that).
+ * Each month scored the way the annual ranges expect: the rainfall total and the mean temperature
+ * and humidity of the 12 months ending with it (so January 2021 reads February 2020 to January
+ * 2021; the request starts a year early for that). Months run from the first averaged year through
+ * 11 months after the current one. A month not measured yet (the current month or later, or one
+ * POWER has not published) counts at its calendar month's average over the averaged years, so the
+ * projection carries the latest measured months forward and settles on the usual climate once a
+ * window holds none of them.
  */
-function rollingMonths(location: PowerLocation, range: ClimateYears): readonly ClimateMonth[] {
+function rollingMonths(location: PowerLocation, range: ClimateYears, now: Date): readonly ClimateMonth[] {
+  const current = now.getFullYear() * 12 + now.getMonth();
+  const normals = Object.fromEntries(
+    CLIMATE_FACTORS.map((factor) => [factor, monthlyNormals(location, factor, range)]),
+  ) as Record<ClimateFactor, readonly (number | null)[]>;
+  const measured = (factor: ClimateFactor, index: number) =>
+    index < current ? monthValue(location, factor, Math.floor(index / 12), (index % 12) + 1) : null;
+
   const months: ClimateMonth[] = [];
-  for (let year = range.first; year <= range.last; year += 1) {
-    for (let month = 1; month <= 12; month += 1) {
-      const values: Partial<Record<ClimateFactor, number>> = {};
-      for (const factor of CLIMATE_FACTORS) {
-        const window: number[] = [];
-        for (let back = 11; back >= 0; back -= 1) {
-          const index = year * 12 + (month - 1) - back;
-          const value = monthValue(location, factor, Math.floor(index / 12), (index % 12) + 1);
-          if (value !== null) window.push(value);
-        }
-        if (window.length < 12) continue;
-        const total = window.reduce((sum, v) => sum + v, 0);
-        values[factor] = factor === "rain" ? total : total / 12;
+  for (let index = range.first * 12; index <= current + 11; index += 1) {
+    const values: Partial<Record<ClimateFactor, number>> = {};
+    for (const factor of CLIMATE_FACTORS) {
+      const window: number[] = [];
+      for (let back = 11; back >= 0; back -= 1) {
+        const i = index - back;
+        const value = measured(factor, i) ?? (i >= range.first * 12 ? normals[factor][i % 12] : null);
+        if (value !== null) window.push(value);
       }
-      months.push({ year, month, values });
+      if (window.length < 12) continue;
+      const total = window.reduce((sum, v) => sum + v, 0);
+      values[factor] = factor === "rain" ? total : total / 12;
     }
+    const projected = CLIMATE_FACTORS.some((factor) => measured(factor, index) === null);
+    months.push({ year: Math.floor(index / 12), month: (index % 12) + 1, projected, values });
   }
   return months;
 }
