@@ -15,4 +15,9 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(120)
   readonly location?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  readonly avatarKey?: string;
 }

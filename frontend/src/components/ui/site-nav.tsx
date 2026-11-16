@@ -9,7 +9,7 @@ import { MobileMenu } from "./mobile-menu";
 /** Marketing header used on the home and about pages. Collapses to a burger below md. */
 export function SiteNav() {
   return (
-    <header className="relative z-40 flex h-[var(--tl-topbar-h)] items-center justify-between gap-4 border-b border-line/60 px-6">
+    <header className="relative z-40 flex h-[var(--tl-topbar-h)] items-center justify-between gap-4 border-b border-line px-4">
       <div className="flex items-center gap-8">
         <Brand />
         <NavLinks className="max-md:hidden" />

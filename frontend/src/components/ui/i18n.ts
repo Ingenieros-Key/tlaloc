@@ -217,3 +217,71 @@ export const authCopy: Record<Lang, {
     tagline: "El dios de la lluvia y la cosecha.",
   },
 };
+
+export const profileCopy: Record<Lang, {
+  title: string;
+  tabProfile: string;
+  tabPassword: string;
+  displayName: string;
+  displayNamePlaceholder: string;
+  email: string;
+  memberSince: string;
+  uploadPhoto: string;
+  changePhoto: string;
+  currentPassword: string;
+  newPassword: string;
+  changePassword: string;
+  adjustTitle: string;
+  zoom: string;
+  save: string;
+  saved: string;
+  cancel: string;
+  passwordChanged: string;
+  close: string;
+  working: string;
+}> = {
+  en: {
+    title: "Your profile",
+    tabProfile: "Profile",
+    tabPassword: "Password",
+    displayName: "Display name",
+    displayNamePlaceholder: "How should we call you?",
+    email: "Email",
+    memberSince: "Member since",
+    uploadPhoto: "Upload photo",
+    changePhoto: "Change photo",
+    currentPassword: "Current password",
+    newPassword: "New password",
+    changePassword: "Change password",
+    adjustTitle: "Adjust your photo",
+    zoom: "Zoom",
+    save: "Save",
+    saved: "Saved",
+    cancel: "Cancel",
+    passwordChanged: "Password updated.",
+    close: "Close",
+    working: "Please wait…",
+  },
+  es: {
+    title: "Tu perfil",
+    tabProfile: "Perfil",
+    tabPassword: "Contraseña",
+    displayName: "Nombre a mostrar",
+    displayNamePlaceholder: "¿Cómo te llamamos?",
+    email: "Correo",
+    memberSince: "Miembro desde",
+    uploadPhoto: "Subir foto",
+    changePhoto: "Cambiar foto",
+    currentPassword: "Contraseña actual",
+    newPassword: "Nueva contraseña",
+    changePassword: "Cambiar contraseña",
+    adjustTitle: "Ajusta tu foto",
+    zoom: "Zoom",
+    save: "Guardar",
+    saved: "Guardado",
+    cancel: "Cancelar",
+    passwordChanged: "Contraseña actualizada.",
+    close: "Cerrar",
+    working: "Espera…",
+  },
+};
