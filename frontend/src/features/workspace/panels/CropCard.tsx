@@ -6,6 +6,7 @@ import { t } from "../strings";
 import type { CropAssessment, FactorScore } from "../types";
 import { Badge } from "../ui/Badge";
 import { formatWithUnit } from "./format";
+import { MonthlyScoreChart } from "./MonthlyScoreChart";
 
 function barColor(score: number): string {
   if (score >= RATING_THRESHOLDS.good) return "bg-good";
@@ -74,6 +75,7 @@ export function CropCard({
           <FactorRow key={factor.layer} factor={factor} years={yearsLabel(assessment)} />
         ))}
       </ul>
+      {assessment.months ? <MonthlyScoreChart crop={t.common.crops[assessment.crop]} months={assessment.months} /> : null}
       {assessment.years && assessment.years.length > 1 ? <YearRow assessment={assessment} /> : null}
       {showLimiting ? (
         <p className="mt-3 flex items-start gap-1.5 border-t border-line pt-2 text-xs text-muted">
