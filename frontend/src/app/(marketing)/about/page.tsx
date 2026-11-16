@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { SiteNav } from "@/components/ui/site-nav";
 import { Reveal } from "@/components/ui/reveal";
 import { aboutCopy } from "@/components/ui/i18n";
 import { useLang } from "@/lib/i18n-store";
@@ -13,6 +12,22 @@ export default function AboutPage() {
   const t = aboutCopy[useLang()];
   const reduce = useReducedMotion();
   const [open, setOpen] = useState<StickerId | null>(null);
+  const photoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && photoRef.current?.contains(e.target)) return;
+      setOpen(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const stickers: Array<{
     id: StickerId;
@@ -46,8 +61,7 @@ export default function AboutPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text">
-      <SiteNav />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12 sm:py-16">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-12 pt-[calc(var(--tl-topbar-h)+2.5rem)] sm:pb-16">
         <div className="grid items-center gap-10 md:grid-cols-[1.05fr_1fr] md:gap-14">
           <div>
             <Reveal delay={0.02}>
@@ -64,7 +78,7 @@ export default function AboutPage() {
           </div>
 
           <Reveal delay={0.2}>
-            <div className="relative">
+            <div className="relative" ref={photoRef}>
               <img
                 src="/team.jpg"
                 alt="Tlaloc team"

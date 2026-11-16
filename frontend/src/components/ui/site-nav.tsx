@@ -19,7 +19,9 @@ export function SiteNav() {
           <LangToggle />
           <ThemeToggle />
         </div>
-        <AuthControl />
+        <div className="flex min-w-[12.5rem] justify-end max-md:min-w-0">
+          <AuthControl />
+        </div>
         <MobileMenu className="md:hidden" />
       </div>
     </header>

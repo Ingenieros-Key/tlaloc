@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { SiteNav } from "@/components/ui/site-nav";
 import { Reveal } from "@/components/ui/reveal";
 import { landingCopy } from "@/components/ui/i18n";
 import { useLang } from "@/lib/i18n-store";
@@ -22,7 +21,7 @@ const css = `
   --piedra: #9aa3c7;
   --obsidiana: #060818;
 }
-.tl-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 3rem 1.5rem 4rem; }
+.tl-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: calc(var(--tl-topbar-h) + 2rem) 1.5rem 4rem; }
 .tl-grid { display: grid; grid-template-columns: 1fr; gap: 2.5rem; width: min(1120px, 94vw); align-items: center; }
 @media (min-width: 900px) { .tl-grid { grid-template-columns: 1.05fr 1fr; gap: 3.5rem; } }
 .tl-col { text-align: left; display: flex; flex-direction: column; gap: 1.25rem; align-items: flex-start; }
@@ -76,7 +75,6 @@ export default function Home() {
   return (
     <div className="tl-root">
       <style>{css}</style>
-      <SiteNav />
 
       <main className="tl-main">
         <div className="tl-grid">
