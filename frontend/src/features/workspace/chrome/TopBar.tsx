@@ -19,7 +19,7 @@ const s = t.chrome.topBar;
  */
 export function TopBar() {
   return (
-    <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-3 border-b border-line bg-bg px-3">
+    <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-3 border-b border-line bg-bg px-4">
       <Brand />
       <NavLinks className="max-lg:hidden" />
       <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line xl:block" />
