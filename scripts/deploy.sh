@@ -31,7 +31,8 @@ echo "==> Environment: $ENVIRONMENT  (region $REGION, mode $MODE)"
 
 if [[ "$MODE" == "all" || "$MODE" == "infra" ]]; then
   echo "==> CDK deploy (data + services)"
-  ( cd "$ROOT/infra" && SES_READY=true pnpm exec cdk deploy \
+  # ENV drives base.config (appPrefix tlaloc-<env>); without it the app synthesizes dev stacks.
+  ( cd "$ROOT/infra" && ENV="$ENVIRONMENT" SES_READY=true pnpm exec cdk deploy \
       "tlaloc-$ENVIRONMENT-data" "tlaloc-$ENVIRONMENT-services" \
       --require-approval never )
 
