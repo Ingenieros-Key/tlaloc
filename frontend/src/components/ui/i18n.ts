@@ -37,6 +37,9 @@ export const navCopy: Record<Lang, {
   notificationsSub: string;
   rotationReminders: string;
   irrigationReminders: string;
+  on: string;
+  off: string;
+  manageInWorkspace: string;
   close: string;
 }> = {
   en: {
@@ -51,9 +54,12 @@ export const navCopy: Record<Lang, {
     language: "Language",
     menu: "Menu",
     notifications: "Notifications",
-    notificationsSub: "Choose which email reminders you'd like to receive.",
+    notificationsSub: "Your email reminders right now.",
     rotationReminders: "Crop rotation reminders",
     irrigationReminders: "Irrigation reminders",
+    on: "On",
+    off: "Off",
+    manageInWorkspace: "Turn these on or off in the workspace, next to crop rotation and irrigation.",
     close: "Close",
   },
   es: {
@@ -68,9 +74,12 @@ export const navCopy: Record<Lang, {
     language: "Idioma",
     menu: "Menú",
     notifications: "Notificaciones",
-    notificationsSub: "Elige qué recordatorios por correo quieres recibir.",
+    notificationsSub: "Tus recordatorios por correo ahora mismo.",
     rotationReminders: "Recordatorios de rotación de cultivos",
     irrigationReminders: "Recordatorios de riego",
+    on: "Activados",
+    off: "Desactivados",
+    manageInWorkspace: "Actívalos o desactívalos en el workspace, junto a la rotación de cultivos y el riego.",
     close: "Cerrar",
   },
 };

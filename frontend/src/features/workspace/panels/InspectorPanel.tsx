@@ -2,12 +2,14 @@
 
 import { MapPinOff, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { useNotifications } from "@/lib/useNotifications";
 import { usePanelCollapse, useWorkspace, useWorkspaceDispatch, type InspectorTab } from "../store";
 import { ModelNotice } from "../chrome/ModelNotice";
 import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
 import { Segmented } from "../ui/Segmented";
+import { SwitchRow } from "../ui/Switch";
 import { ClimateTab } from "./ClimateTab";
 import { CropCard } from "./CropCard";
 import { IrrigationCard } from "./IrrigationCard";
@@ -73,7 +75,10 @@ export function InspectorPanel() {
               />
             </div>
             {inspectorTab === "rotation" ? (
-              <RotationTab />
+              <>
+                <RotationTab />
+                {planting?.crop ? <ReminderToggle pref="rotation" /> : null}
+              </>
             ) : inspectorTab === "climate" ? (
               <ClimateTab />
             ) : (
@@ -90,6 +95,21 @@ export function InspectorPanel() {
         ) : null}
       </div>
     </Panel>
+  );
+}
+
+/** Email-reminder toggle for signed-in users; prefs persist via the shared notifications store. */
+function ReminderToggle({ pref }: { readonly pref: "rotation" | "irrigation" }) {
+  const { prefs, setPref, signedIn } = useNotifications();
+  if (!signedIn) return null;
+  return (
+    <div className="border-t border-line px-3 py-2">
+      <SwitchRow
+        label={t.inspector.reminder.label}
+        checked={prefs[pref]}
+        onChange={(value) => setPref(pref, value)}
+      />
+    </div>
   );
 }
 

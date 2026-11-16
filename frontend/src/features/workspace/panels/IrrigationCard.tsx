@@ -2,10 +2,12 @@
 
 import { CalendarDays, Droplets } from "lucide-react";
 import { useState } from "react";
+import { useNotifications } from "@/lib/useNotifications";
 import { computeIrrigation, type IrrigationPlan } from "../data/irrigation";
 import { useWorkspace } from "../store";
 import { t } from "../strings";
 import type { AnalysisState, CropId } from "../types";
+import { SwitchRow } from "../ui/Switch";
 import { IrrigationCalendar } from "./IrrigationCalendar";
 
 const s = t.inspector.irrigation;
@@ -64,8 +66,24 @@ export function IrrigationCard() {
           {calendarOpen ? <IrrigationCalendar plan={plan} /> : null}
         </>
       ) : null}
+      <ReminderToggle />
       <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-muted">{s.note}</p>
     </article>
+  );
+}
+
+/** Email-reminder toggle for irrigation; only for signed-in users (prefs need an account). */
+function ReminderToggle() {
+  const { prefs, setPref, signedIn } = useNotifications();
+  if (!signedIn) return null;
+  return (
+    <div className="mt-3 border-t border-line pt-2">
+      <SwitchRow
+        label={t.inspector.reminder.label}
+        checked={prefs.irrigation}
+        onChange={(value) => setPref("irrigation", value)}
+      />
+    </div>
   );
 }
 
