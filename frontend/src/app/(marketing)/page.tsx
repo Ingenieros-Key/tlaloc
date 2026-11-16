@@ -83,7 +83,7 @@ export default function Home() {
           </div>
 
           <Reveal delay={0.2}>
-            <video className="tl-video" src="/tlaloc-intro.mp4" controls playsInline preload="metadata" />
+            <video className="tl-video" src="/tlaloc-intro-2.mp4" controls playsInline preload="metadata" />
           </Reveal>
         </div>
       </main>

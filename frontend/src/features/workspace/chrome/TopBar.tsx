@@ -18,22 +18,30 @@ const s = t.chrome.topBar;
  * links, language, theme and sign-in fold into a menu so the bar fits a 375 px phone.
  */
 export function TopBar() {
+  const { plotSummary, plotName } = useWorkspace();
+  // Only show a plot name once there's a plot that's been named (not the default placeholder).
+  const named = plotSummary !== null && plotName.trim() !== "" && plotName !== t.browser.plotName;
   return (
     <header className="relative z-40 flex h-[var(--tl-topbar-h)] shrink-0 items-center gap-3 border-b border-line bg-bg px-4">
       <Brand />
       <NavLinks className="max-lg:hidden" />
-      <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line xl:block" />
-      <p className="hidden min-w-0 truncate text-sm text-muted xl:block">
-        <span className="sr-only">{s.projectLabel} </span>
-        {s.projectName}
-      </p>
+      {named && (
+        <>
+          <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line xl:block" />
+          <p className="hidden min-w-0 truncate text-sm text-muted xl:block">{plotName}</p>
+        </>
+      )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div className="flex items-center lg:hidden">
           <InspectorToggle />
           <SiteMenu />
         </div>
-        <div className="max-lg:hidden">
-          <AuthControl menuExtras />
+        <div className="flex items-center gap-3 max-lg:hidden">
+          <LangToggle />
+          <ThemeToggle />
+          <div className="flex min-w-[12.5rem] justify-end">
+            <AuthControl />
+          </div>
         </div>
       </div>
     </header>
