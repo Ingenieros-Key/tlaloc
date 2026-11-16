@@ -14,6 +14,7 @@ import {
   type RotationStep,
   type Season,
 } from "../data/rotation";
+import { measuredValue, trendForecast } from "../data/cycles";
 import { useRotation } from "../hooks/useRotation";
 import { cropName, seasonLabel } from "../panels/rotationFormat";
 import { browserVisible, useWorkspace, useWorkspaceDispatch } from "../store";
@@ -59,10 +60,11 @@ function serial(year: number, month: number): number {
 const PLANTED_WITHIN_MONTHS = 6;
 
 /** Rows share these columns: the plan's name, the month axis, then its ratings and the pick. */
-const ROW = "grid grid-cols-[132px_minmax(0,1fr)_212px] items-center gap-x-3";
+const ROW = "grid grid-cols-[132px_minmax(0,1fr)_236px] items-center gap-x-3";
 /** Width of everything in a row but the axis: the two fixed columns and the gaps between the three. */
-const ROW_FIXED_PX = 132 + 212 + 2 * 12;
-const METRICS = "grid grid-cols-[44px_64px_32px_1fr] items-center gap-x-2";
+const ROW_FIXED_PX = 132 + 236 + 2 * 12;
+/** Soil, water, fit, then the pick: 72px holds "✓ Chosen" and the Choose button (236px in all). */
+const METRICS = "grid grid-cols-[44px_64px_32px_72px] items-center gap-x-2";
 
 /** The axis from `from` to the end of the last season: each season a column, each gap a rest. */
 function segmentsFor(from: number, seasons: readonly Season[]): Segment[] {
@@ -115,7 +117,7 @@ const LEVEL_TONE = { good: "text-good", poor: "text-poor", mid: "text-text" } as
  */
 export function RotationLanes() {
   const state = useWorkspace();
-  const { planting, priority, rotationStart, rotationSeasons, plotRain, plotName } = state;
+  const { planting, priority, rotationStart, rotationSeasons, plotCycles, plotName } = state;
   const dispatch = useWorkspaceDispatch();
   const { plan, fits, today } = useRotation();
 
@@ -166,9 +168,24 @@ export function RotationLanes() {
   }
   const todayLeft = `${(todayUnits / units) * 100}%`;
 
-  const rainMax = plotRain ? Math.max(1, ...plotRain) : 1;
-  const wettest = plotRain ? plotRain.indexOf(Math.max(...plotRain)) + 1 : 0;
-  const driest = plotRain ? plotRain.indexOf(Math.min(...plotRain)) + 1 : 0;
+  // Rain on the axis: what NASA measured before this month, then this month to the end of the plan,
+  // each predicted from the trend of the same calendar month in past years (kept within the lowest
+  // and highest that month has had, so the later years cannot drift off).
+  const lastSegment = segments[segments.length - 1];
+  const axisEnd = lastSegment ? lastSegment.first + lastSegment.months - 1 : now;
+  const rainCycle = plotCycles.status === "ready" ? plotCycles.cycles.factors.rain : null;
+  const rainRange = plotCycles.status === "ready" ? plotCycles.cycles.range : null;
+  const rainAt = (month: number): { readonly mm: number; readonly predicted: boolean } | null => {
+    if (!rainCycle) return null;
+    const at = { year: Math.floor(month / 12), month: (month % 12) + 1 };
+    const predicted = month >= now;
+    const mm = predicted ? trendForecast(rainCycle, at) : measuredValue(rainCycle, at);
+    return mm === null ? null : { mm, predicted };
+  };
+  // Scaled to the usual wettest month (its 5-year average), so a bar reads against the usual rains;
+  // a wetter month than that fills the row.
+  const rainMax = rainCycle ? Math.max(1, ...rainCycle.mean.map((v) => v ?? 0)) : 1;
+  const monthName = (month: number) => `${t.rotation.month((month % 12) + 1)} ${Math.floor(month / 12)}`;
 
   const margin = browserVisible(state)
     ? "lg:ml-[calc(var(--tl-rail-w)+var(--tl-browser-w)+0.75rem)]"
@@ -222,25 +239,36 @@ export function RotationLanes() {
           <div className={ROW}>
             <div className="flex flex-col leading-tight">
               <span className="font-medium">{s.rain}</span>
-              <span className="text-[11px] text-muted">{plotRain ? s.rainSource : s.rainLoading}</span>
+              <span className="text-[11px] text-muted">{rainCycle ? s.rainSource : s.rainLoading}</span>
             </div>
             <div
               role="img"
-              aria-label={plotRain ? s.rainLabel(t.rotation.month(wettest), t.rotation.month(driest)) : s.rainLoading}
+              aria-label={
+                rainCycle && rainRange
+                  ? s.rainLabel(monthName(now), monthName(axisEnd), rainRange.first)
+                  : s.rainLoading
+              }
               className="relative grid h-8 border-b border-line"
               style={columns}
             >
               {segments.map((segment) => (
                 <span key={segment.first} className="flex h-full items-end gap-px px-px">
-                  {Array.from({ length: segment.months }, (_, m) => (
-                    <span
-                      key={m}
-                      className="min-w-0 flex-1 rounded-t-sm bg-[#4aa3e8]"
-                      style={{
-                        height: plotRain ? `${Math.max(4, (plotRain[(segment.first + m) % 12] / rainMax) * 100)}%` : "4%",
-                      }}
-                    />
-                  ))}
+                  {Array.from({ length: segment.months }, (_, m) => {
+                    const month = segment.first + m;
+                    const rain = rainAt(month);
+                    return rain ? (
+                      <span
+                        key={m}
+                        title={s.rainBar(monthName(month), Math.round(rain.mm), rain.predicted)}
+                        className={`min-w-0 flex-1 rounded-t-sm ${
+                          rain.predicted ? "border border-b-0 border-dashed border-[#2b7fc4] bg-[#4aa3e8]/55" : "bg-[#4aa3e8]"
+                        }`}
+                        style={{ height: `${Math.min(100, Math.max(4, (rain.mm / rainMax) * 100))}%` }}
+                      />
+                    ) : (
+                      <span key={m} className="min-w-0 flex-1" />
+                    );
+                  })}
                 </span>
               ))}
               <TodayLine left={todayLeft} label />

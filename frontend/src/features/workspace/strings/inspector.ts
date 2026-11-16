@@ -21,11 +21,33 @@ export const inspector = {
   nasaSource: "NASA",
   /** Where each factor's value comes from, on its NASA badge. */
   sourceHints: {
-    rain: "NASA POWER: total rainfall over the last 12 months at this plot",
-    temp: "NASA POWER: mean air temperature over the last 12 months at this plot",
-    humidity: "NASA POWER: mean relative humidity over the last 12 months at this plot",
-    elevation: "NASA SRTM: mean height of the hexagons this plot covers",
-  } satisfies Record<FactorId, string>,
+    rain: (years: string) => `NASA POWER: average annual rainfall at this plot, ${years}`,
+    temp: (years: string) => `NASA POWER: average air temperature at this plot, ${years}`,
+    humidity: (years: string) => `NASA POWER: average relative humidity at this plot, ${years}`,
+    elevation: () => "NASA SRTM: mean height of the hexagons this plot covers",
+  } satisfies Record<FactorId, (years: string) => string>,
+  /** The crop's score month by month across the climate years (rolling 12 months). */
+  monthly: {
+    title: "Month by month",
+    basis: "Each on its last 12 months",
+    readout: (month: string, score: string, season: string, projected: boolean) =>
+      `${month}: ${score} · ${season}${projected ? " · projected" : ""}`,
+    noScore: "no score",
+    range: (low: string, lowMonth: string, high: string, highMonth: string) =>
+      `Measured: lowest ${low} (${lowMonth}), highest ${high} (${highMonth})`,
+    chartLabel: (crop: string, low: string, high: string, end: string | null) =>
+      `${crop} score each month, on the 12 months before it. Lowest measured ${low}, highest ${high}.` +
+      (end ? ` Projected from the 5-year monthly averages to ${end}.` : ""),
+    projected: "Projected",
+    projectedKey: "Projected (5-year monthly averages)",
+    legendLabel: "Monthly chart key",
+    thresholds: "Good 70 · Fair 45",
+  },
+  /** The crop scored on each year behind the average. */
+  byYear: "Each year",
+  byYearLabel: (crop: string) => `${crop} score in each of the last years`,
+  yearScore: (year: number, score: number, rating: string) => `${year}: ${score} of 100, ${rating}`,
+  yearRange: (first: number, last: number) => (first === last ? `${first}` : `${first}–${last}`),
   outlookHeading: "Planting outlook",
   loadingOutlook: "Analyzing plot",
   outside: "This plot is outside the data coverage. Draw inside El Salvador's outline.",

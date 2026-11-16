@@ -8,7 +8,9 @@ import { t } from "../strings";
 import type { AnalysisState, CropAssessment, PlotSummary } from "../types";
 import { Panel } from "../ui/Panel";
 import { Segmented } from "../ui/Segmented";
+import { ClimateTab } from "./ClimateTab";
 import { CropCard } from "./CropCard";
+import { SeasonBandsLegend } from "./MonthlyScoreChart";
 import { DisplayPanel } from "./DisplayPanel";
 import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
 import { RotationTab } from "./RotationTab";
@@ -64,12 +66,15 @@ export function InspectorPanel() {
                 options={[
                   { value: "outlook", label: t.rotation.tabs.outlook },
                   { value: "rotation", label: t.rotation.tabs.rotation },
+                  { value: "climate", label: t.rotation.tabs.climate },
                 ]}
                 onChange={(tab) => dispatch({ type: "setInspectorTab", tab })}
               />
             </div>
             {inspectorTab === "rotation" ? (
               <RotationTab />
+            ) : inspectorTab === "climate" ? (
+              <ClimateTab />
             ) : (
               <Section id="inspector-outlook" heading={t.inspector.outlookHeading} aside={<ModelNotice align="end" />}>
                 <Outlook analysis={analysis} />
@@ -191,12 +196,19 @@ function Outlook({ analysis }: { readonly analysis: AnalysisState }) {
   const crops = sortByScore(analysis.result.crops);
   const top = crops[0]?.score;
   return (
-    <ol className="space-y-2">
-      {crops.map((crop) => (
-        <li key={crop.crop}>
-          <CropCard assessment={crop} best={crop.score === top} />
-        </li>
-      ))}
-    </ol>
+    <>
+      {crops.some((crop) => crop.months && crop.months.length > 1) ? (
+        <div className="mb-2">
+          <SeasonBandsLegend />
+        </div>
+      ) : null}
+      <ol className="space-y-2">
+        {crops.map((crop) => (
+          <li key={crop.crop}>
+            <CropCard assessment={crop} best={crop.score === top} />
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }

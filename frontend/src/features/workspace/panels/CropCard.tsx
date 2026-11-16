@@ -6,12 +6,15 @@ import { t } from "../strings";
 import type { CropAssessment, FactorScore } from "../types";
 import { Badge } from "../ui/Badge";
 import { formatWithUnit } from "./format";
+import { MonthlyScoreChart } from "./MonthlyScoreChart";
 
 function barColor(score: number): string {
   if (score >= RATING_THRESHOLDS.good) return "bg-good";
   if (score >= RATING_THRESHOLDS.fair) return "bg-fair";
   return "bg-poor";
 }
+
+const RATING_TEXT = { good: "text-good", fair: "text-fair", poor: "text-poor" } as const;
 
 function limitingSentence(assessment: CropAssessment): string {
   const factor = assessment.factors.find((f) => f.layer === assessment.limiting);
@@ -69,9 +72,11 @@ export function CropCard({
       </header>
       <ul className="mt-3 space-y-2">
         {assessment.factors.map((factor) => (
-          <FactorRow key={factor.layer} factor={factor} />
+          <FactorRow key={factor.layer} factor={factor} years={yearsLabel(assessment)} />
         ))}
       </ul>
+      {assessment.months ? <MonthlyScoreChart crop={t.common.crops[assessment.crop]} months={assessment.months} /> : null}
+      {assessment.years && assessment.years.length > 1 ? <YearRow assessment={assessment} /> : null}
       {showLimiting ? (
         <p className="mt-3 flex items-start gap-1.5 border-t border-line pt-2 text-xs text-muted">
           <LimitIcon
@@ -86,7 +91,41 @@ export function CropCard({
   );
 }
 
-function FactorRow({ factor }: { readonly factor: FactorScore }) {
+/** The years behind the climate average, e.g. "2021–2025". */
+function yearsLabel(assessment: CropAssessment): string {
+  const years = assessment.years ?? [];
+  if (years.length === 0) return "";
+  return t.inspector.yearRange(years[0].year, years[years.length - 1].year);
+}
+
+/** The crop scored on each year behind the average: how steady the fit is from year to year. */
+function YearRow({ assessment }: { readonly assessment: CropAssessment }) {
+  const years = assessment.years ?? [];
+  return (
+    <div className="mt-3 flex items-center gap-2 border-t border-line pt-2 text-xs">
+      <span className="shrink-0 text-muted">{t.inspector.byYear}</span>
+      <ul aria-label={t.inspector.byYearLabel(t.common.crops[assessment.crop])} className="ml-auto flex gap-1">
+        {years.map(({ year, score, rating }) => (
+          <li
+            key={year}
+            title={t.inspector.yearScore(year, score, t.common.ratings[rating])}
+            className="flex flex-col items-center rounded bg-surface px-1.5 py-0.5 leading-tight ring-1 ring-inset ring-line"
+          >
+            <span aria-hidden="true" className="font-mono text-[10px] text-muted tabular">
+              {String(year).slice(2)}
+            </span>
+            <span aria-hidden="true" className={`font-mono font-medium tabular ${RATING_TEXT[rating]}`}>
+              {score}
+            </span>
+            <span className="sr-only">{t.inspector.yearScore(year, score, t.common.ratings[rating])}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function FactorRow({ factor, years }: { readonly factor: FactorScore; readonly years: string }) {
   const name = t.common.layers[factor.layer];
   const score = Math.round(factor.score);
   return (
@@ -96,7 +135,7 @@ function FactorRow({ factor }: { readonly factor: FactorScore }) {
           <span className="truncate text-muted">{name}</span>
           {factor.source === "nasa" ? (
             <span
-              title={t.inspector.sourceHints[factor.layer]}
+              title={t.inspector.sourceHints[factor.layer](years)}
               className="shrink-0 rounded px-1 text-[11px] font-medium leading-4 text-accent ring-1 ring-inset ring-accent/40"
             >
               {t.inspector.nasaSource}
