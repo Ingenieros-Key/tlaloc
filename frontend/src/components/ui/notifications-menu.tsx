@@ -1,17 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Bell, X } from "lucide-react";
 import { useLang } from "@/lib/i18n-store";
-import { cn } from "@/lib/utils";
+import { useNotifications } from "@/lib/useNotifications";
 import { navCopy } from "./i18n";
-import {
-  getNotifications,
-  saveNotifications,
-  type NotificationPrefs,
-} from "@/lib/notifications-api";
 
-/** Email-reminder preferences dialog, opened from the signed-in user menu. */
+/** Read-only overview of the signed-in user's email reminders. Toggling happens in the workspace. */
 export function NotificationsMenu({
   open,
   onClose,
@@ -21,35 +16,14 @@ export function NotificationsMenu({
 }) {
   const lang = useLang();
   const t = navCopy[lang];
-  const [prefs, setPrefs] = useState<NotificationPrefs>({ rotation: false, irrigation: false });
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const { prefs, loading } = useNotifications();
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    getNotifications()
-      .then((p) => setPrefs({ rotation: p.rotation, irrigation: p.irrigation }))
-      .catch(() => {})
-      .finally(() => setLoading(false));
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
-
-  async function toggle(key: keyof NotificationPrefs) {
-    const prev = prefs;
-    const next = { ...prefs, [key]: !prefs[key] };
-    setPrefs(next);
-    setBusy(true);
-    try {
-      await saveNotifications({ ...next, locale: lang });
-    } catch {
-      setPrefs(prev);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (!open) return null;
 
@@ -80,59 +54,40 @@ export function NotificationsMenu({
           </button>
         </div>
         <p className="mb-5 text-sm text-text/70">{t.notificationsSub}</p>
-        <div className="space-y-2">
-          <ToggleRow
-            label={t.rotationReminders}
-            checked={prefs.rotation}
-            disabled={loading || busy}
-            onToggle={() => toggle("rotation")}
-          />
-          <ToggleRow
-            label={t.irrigationReminders}
-            checked={prefs.irrigation}
-            disabled={loading || busy}
-            onToggle={() => toggle("irrigation")}
-          />
-        </div>
+        <dl className="space-y-2" aria-busy={loading}>
+          <StatusRow label={t.rotationReminders} on={prefs.rotation} onLabel={t.on} offLabel={t.off} />
+          <StatusRow label={t.irrigationReminders} on={prefs.irrigation} onLabel={t.on} offLabel={t.off} />
+        </dl>
+        <p className="mt-5 text-xs text-text/60">{t.manageInWorkspace}</p>
       </div>
     </div>
   );
 }
 
-function ToggleRow({
+function StatusRow({
   label,
-  checked,
-  disabled,
-  onToggle,
+  on,
+  onLabel,
+  offLabel,
 }: {
   label: string;
-  checked: boolean;
-  disabled: boolean;
-  onToggle: () => void;
+  on: boolean;
+  onLabel: string;
+  offLabel: string;
 }) {
   return (
     <div className="flex items-center justify-between rounded-xl border border-line bg-surface-3 px-4 py-3">
-      <span className="font-mono text-sm">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={onToggle}
-        className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          checked ? "bg-accent" : "bg-line",
-          disabled && "opacity-50",
-        )}
+      <dt className="font-mono text-sm">{label}</dt>
+      <dd
+        className={
+          on
+            ? "inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-accent"
+            : "inline-flex items-center gap-1.5 font-mono text-sm text-text/50"
+        }
       >
-        <span
-          className={cn(
-            "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-            checked ? "translate-x-5" : "translate-x-0.5",
-          )}
-        />
-      </button>
+        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${on ? "bg-accent" : "bg-line"}`} />
+        {on ? onLabel : offLabel}
+      </dd>
     </div>
   );
 }

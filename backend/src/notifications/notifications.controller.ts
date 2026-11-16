@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Put, UseGuards } from '@nestjs/common';
 import { CognitoGuard } from '../common/auth/cognito.guard.js';
 import { CurrentUser } from '../common/auth/current-user.decorator.js';
 import * as AuthTypes from '../common/auth/types.js';
@@ -9,7 +9,7 @@ import { NotificationPrefs } from './types.js';
 @Controller('notifications')
 @UseGuards(CognitoGuard)
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(@Inject(NotificationsService) private readonly notifications: NotificationsService) {}
 
   @Get()
   get(@CurrentUser() user: AuthTypes.AuthUser): Promise<NotificationPrefs> {
