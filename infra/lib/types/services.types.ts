@@ -10,6 +10,7 @@ export type ServicesStackProps = StackProps & {
   readonly baseConfig: BaseConfig;
   readonly profilesTable: dynamodb.Table;
   readonly plotsTable: dynamodb.Table;
+  readonly notificationsTable: dynamodb.Table;
   readonly mediaBucket: s3.Bucket;
   readonly userPool: cognito.UserPool;
   readonly userPoolClient: cognito.UserPoolClient;

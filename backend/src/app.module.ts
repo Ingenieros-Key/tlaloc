@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { HealthModule } from './health/health.module.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
 import { PlotsModule } from './plots/plots.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { PlotsModule } from './plots/plots.module.js';
     HealthModule,
     ProfilesModule,
     PlotsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

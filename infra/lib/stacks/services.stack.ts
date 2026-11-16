@@ -49,6 +49,7 @@ export class ServicesStack extends Stack {
       environment: {
         PROFILES_TABLE: props.profilesTable.tableName,
         PLOTS_TABLE: props.plotsTable.tableName,
+        NOTIFICATIONS_TABLE: props.notificationsTable.tableName,
         MEDIA_BUCKET: props.mediaBucket.bucketName,
         USER_POOL_ID: props.userPool.userPoolId,
         USER_POOL_CLIENT_ID: props.userPoolClient.userPoolClientId,
@@ -58,6 +59,7 @@ export class ServicesStack extends Stack {
 
     props.profilesTable.grantReadWriteData(apiFn);
     props.plotsTable.grantReadWriteData(apiFn);
+    props.notificationsTable.grantReadWriteData(apiFn);
     props.mediaBucket.grantReadWrite(apiFn);
 
     const accessLogGroup = new logs.LogGroup(this, "ApiAccessLogs", {

@@ -50,7 +50,7 @@ describe("DataStack", () => {
         PostConfirmation: { "Fn::GetAtt": [Match.anyValue(), "Arn"] },
       },
     });
-    t.resourceCountIs("AWS::Lambda::Permission", 2);
+    t.resourceCountIs("AWS::Lambda::Permission", 3);
     t.hasResourceProperties("AWS::Lambda::Function", {
       Runtime: "nodejs22.x",
       Architectures: ["arm64"],

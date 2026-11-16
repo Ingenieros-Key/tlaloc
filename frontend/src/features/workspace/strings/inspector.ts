@@ -76,6 +76,38 @@ export const inspector = {
     `Analysis complete. ${crops.length > 1 ? "Best matches" : "Best match"}: ${new Intl.ListFormat("en-US").format(crops)}, ${rating}, ${score} of 100.`,
   announceOutside: "Analysis complete. This plot is outside the data coverage.",
   announceMissing: "Analysis incomplete. NASA data for this plot is missing.",
+  /** The irrigation plan card and its calendar. */
+  irrigation: {
+    heading: "Irrigation plan",
+    note: "Heuristic estimate from NASA climate — calibrate before use.",
+    needData: "Waiting for this plot's climate to plan irrigation.",
+    rainfed: "Rainfall is meeting this crop's water needs right now — no irrigation required.",
+    volume: "Water per watering",
+    frequency: "Frequency",
+    duration: "Run time",
+    target: "Target soil moisture",
+    liters: (value: string) => `${value} L`,
+    minutes: (value: string) => `${value} min`,
+    moistureBand: (low: number, high: number) => `${low}–${high}%`,
+    timesPerDay: (times: number) => (times === 1 ? "once a day" : `${times}× a day`),
+    daysPerWeek: (days: number) =>
+      days >= 7 ? "every day" : days === 1 ? "1 day a week" : `${days} days a week`,
+    frequencyValue: (timesLabel: string, daysLabel: string) => `${timesLabel}, ${daysLabel}`,
+    summary: (liters: string, freq: string, minutes: string) =>
+      `Apply about ${liters} L per watering, ${freq} (~${minutes} min each).`,
+    calendar: {
+      open: "Irrigation calendar",
+      close: "Hide calendar",
+      viewLabel: "Calendar view",
+      views: { day: "Day", week: "Week", month: "Month" },
+      water: "Water",
+      rest: "Rest",
+      none: "No irrigation scheduled.",
+      today: "Today",
+      event: (time: string, liters: string) => `${time} · ${liters} L`,
+      weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const,
+    },
+  },
   display: {
     close: "Close Display",
     title: "Display",

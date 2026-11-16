@@ -1,4 +1,4 @@
-import { Stack, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, RemovalPolicy, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import {
   aws_dynamodb as dynamodb,
@@ -9,6 +9,8 @@ import {
   aws_lambda_nodejs as nodejs,
   aws_logs as logs,
   aws_iam as iam,
+  aws_events as events,
+  aws_events_targets as targets,
   CfnOutput,
 } from "aws-cdk-lib";
 import * as path from "path";
@@ -34,6 +36,7 @@ const triggerBundlingExternals = [
 export class DataStack extends Stack {
   public readonly profilesTable: dynamodb.Table;
   public readonly plotsTable: dynamodb.Table;
+  public readonly notificationsTable: dynamodb.Table;
   public readonly mediaBucket: s3.Bucket;
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
@@ -60,6 +63,17 @@ export class DataStack extends Stack {
       tableName: dataConfig.plotsTableName,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "plotId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy,
+    });
+
+    // Email-reminder preferences per user: userId partition. Record also carries the
+    // user's email + locale (stamped at save time) so the scheduled reminder Lambda can
+    // fan out without a per-user Cognito lookup.
+    this.notificationsTable = new dynamodb.Table(this, "NotificationsTable", {
+      tableName: dataConfig.notificationsTableName,
+      partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
       removalPolicy,
@@ -139,6 +153,47 @@ export class DataStack extends Stack {
     }
 
     this.addCognitoTriggers(sesIdentityArn, this.assetsBaseUrl);
+    this.addReminderSchedule(sesIdentityArn, this.assetsBaseUrl);
+  }
+
+  // Scheduled reminder fan-out lives here with the notifications table (its data source)
+  // and the SES identity grant. Daily EventBridge rule; the handler reads recipient email +
+  // locale straight off each prefs record, so no Cognito/profiles access is needed.
+  private addReminderSchedule(sesIdentityArn: string, assetsBaseUrl: string): void {
+    const fn = new nodejs.NodejsFunction(this, "ReminderFn", {
+      functionName: buildName("reminder"),
+      entry: path.join(triggerDir, "reminder.ts"),
+      handler: "handler",
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      timeout: Duration.seconds(60),
+      logGroup: new logs.LogGroup(this, "reminder-logs", {
+        logGroupName: `/aws/lambda/${buildName("reminder")}`,
+        retention: logs.RetentionDays.TWO_WEEKS,
+        removalPolicy: RemovalPolicy.DESTROY,
+      }),
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: { minify: true, externalModules: triggerBundlingExternals },
+      environment: {
+        NOTIFICATIONS_TABLE: this.notificationsTable.tableName,
+        TLALOC_ASSET_BASE_URL: assetsBaseUrl,
+        REGION: this.region,
+      },
+    });
+
+    this.notificationsTable.grantReadData(fn);
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail"],
+        resources: [sesIdentityArn],
+      }),
+    );
+
+    new events.Rule(this, "ReminderSchedule", {
+      ruleName: buildName("reminder"),
+      schedule: events.Schedule.rate(Duration.days(1)),
+      targets: [new targets.LambdaFunction(fn)],
+    });
   }
 
   // ponytail: these trigger lambdas are stateless, but they live in this stateful stack

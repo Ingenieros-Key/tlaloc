@@ -6,6 +6,8 @@ import { useAuthProfile } from "@/lib/auth";
 import { listPlots, createPlot, updatePlot, deletePlot, type PlotRecord } from "@/lib/plots-api";
 import type { PlotFeature } from "../types";
 import type { Planting, Priority } from "./rotation";
+import { summarizePlot } from "./plot";
+import { setPins, setSelect } from "../map/plotPins";
 
 /**
  * Account-persisted land plots on top of the single active plot. Signed-in users get their drawn
@@ -77,6 +79,38 @@ export function useSavedPlots() {
       requestAnimationFrame(() => get()?.focusPlot());
     },
     [dispatch, get],
+  );
+
+  // Publish the saved plots (minus the active one, which is already drawn) as map pins, plus how a
+  // pin click loads its plot. Cleared on sign-out and unmount.
+  useEffect(() => {
+    if (!signedIn) {
+      setPins([]);
+      return;
+    }
+    setPins(
+      plots
+        .filter((p) => p.plotId !== activeId)
+        .map((p) => {
+          const [lng, lat] = summarizePlot({ type: "Feature", properties: {}, geometry: p.geometry } as PlotFeature).centroid;
+          return { plotId: p.plotId, name: p.name, lngLat: [lng, lat] as [number, number] };
+        }),
+    );
+  }, [signedIn, plots, activeId]);
+
+  useEffect(() => {
+    setSelect((plotId) => {
+      const rec = plots.find((p) => p.plotId === plotId);
+      if (rec) select(rec);
+    });
+  }, [plots, select]);
+
+  useEffect(
+    () => () => {
+      setPins([]);
+      setSelect(() => {});
+    },
+    [],
   );
 
   const remove = useCallback(
