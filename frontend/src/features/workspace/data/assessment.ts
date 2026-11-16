@@ -11,6 +11,7 @@ import type {
   PlotFeature,
   Rating,
 } from "../types";
+import type { Climate } from "./climate";
 import { CROP_ORDER, RATING_THRESHOLDS } from "./crops";
 import { CROP_MODELS, optimumPosition, viability } from "./viability";
 
@@ -76,29 +77,42 @@ export function scoreCrop(crop: CropId, values: Readonly<Partial<Record<FactorId
 }
 
 /**
- * Scores each crop for the plot. Temperature, rainfall and humidity are NASA POWER's 12-month
- * values at the plot; elevation is the mean of the elevation hexagons the plot covers (NASA SRTM).
+ * Scores each crop for the plot. Temperature, rainfall and humidity are NASA POWER's averages over
+ * the last complete years at the plot (see `climate.ts`); elevation is the mean of the elevation
+ * hexagons the plot covers (NASA SRTM). Each crop is also scored on every one of those years.
  */
 export function computeAssessment(
   plot: PlotFeature,
   grid: readonly GridCell[],
-  climate: Readonly<Partial<Record<Exclude<FactorId, "elevation">, number>>>,
+  climate: Climate | null,
   elevation: Float32Array | null,
 ): Assessment {
   const cells = sampleCells(plot, grid);
   if (cells.length === 0) return { kind: "outside" };
 
-  const values: Partial<Record<FactorId, number>> = { ...climate };
+  let height: number | undefined;
   if (elevation) {
     const heights = cells.map((i) => elevation[i]).filter((h) => Number.isFinite(h));
-    if (heights.length > 0) values.elevation = heights.reduce((sum, h) => sum + h, 0) / heights.length;
+    if (heights.length > 0) height = heights.reduce((sum, h) => sum + h, 0) / heights.length;
   }
+  const values: Partial<Record<FactorId, number>> = { ...climate?.mean, elevation: height };
   const missing = FACTOR_ORDER.filter((id) => values[id] === undefined || !Number.isFinite(values[id]));
   if (missing.length > 0) return { kind: "missing", missing };
 
-  return {
-    kind: "ok",
-    cellsSampled: cells.length,
-    crops: CROP_ORDER.map((id) => scoreCrop(id, values)).filter((c): c is CropAssessment => c !== null),
-  };
+  const crops = CROP_ORDER.flatMap((id) => {
+    const average = scoreCrop(id, values);
+    if (!average) return [];
+    const years = (climate?.years ?? []).flatMap((year) => {
+      const result = scoreCrop(id, { ...year.values, elevation: height });
+      return result ? [{ year: year.year, score: result.score, rating: result.rating }] : [];
+    });
+    const months = (climate?.months ?? []).map(({ year, month, projected, values: monthValues }) => ({
+      year,
+      month,
+      projected,
+      score: scoreCrop(id, { ...monthValues, elevation: height })?.score ?? null,
+    }));
+    return [{ ...average, years, months }];
+  });
+  return { kind: "ok", cellsSampled: cells.length, crops };
 }

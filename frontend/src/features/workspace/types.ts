@@ -130,6 +130,24 @@ export type CropAssessment = {
   readonly factors: readonly FactorScore[];
   /** The factor with the lowest score (null when every factor is within its ideal band). */
   readonly limiting: FactorId | null;
+  /**
+   * The same crop scored on each year behind the average, oldest first (plot outlook only), to show
+   * how steady the fit is. Years missing a value are left out.
+   */
+  readonly years?: readonly YearScore[];
+  /** The crop scored on every month of those years, each on its rolling 12 months (plot outlook only). */
+  readonly months?: readonly MonthScore[];
+};
+
+export type YearScore = { readonly year: number; readonly score: number; readonly rating: Rating };
+
+/** A month's score on its rolling 12-month climate; null when a value is missing. `month` is 1–12. */
+export type MonthScore = {
+  readonly year: number;
+  readonly month: number;
+  readonly score: number | null;
+  /** Scored partly on the 5-year monthly averages because the month is not measured yet. */
+  readonly projected: boolean;
 };
 
 export type Assessment =

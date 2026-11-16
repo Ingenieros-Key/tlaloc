@@ -4,7 +4,8 @@
  * gets an aptitude from 0 to 1 on a trapezoid (0 outside the absolute limits, 1 inside the optimum
  * band, linear in between), and the index is the weighted sum × 100.
  *
- * A direct translation of the team's Python model (one script per crop). It is pure TypeScript
+ * A direct translation of the team's Python model (one script per crop), with the per-crop weights
+ * from the SiembraClima table instead of the scripts' shared ones. It is pure TypeScript
  * with no browser or React code, so the same module can run in a Lambda later.
  *
  * Provenance of the ranges (from the model's own notes): temperature and annual rainfall follow
@@ -34,7 +35,7 @@ export type AptitudeCurve =
 
 export type CropModel = {
   readonly curves: Readonly<Record<ViabilityVariable, AptitudeCurve>>;
-  /** Sum to 1. */
+  /** Relative importance of each variable, per crop (SiembraClima weights table); sum to 1. */
   readonly weights: Readonly<Record<ViabilityVariable, number>>;
 };
 
@@ -42,9 +43,6 @@ const trapezoid = (min: number, optMin: number, optMax: number, max: number): Ap
   kind: "trapezoid",
   range: [min, optMin, optMax, max],
 });
-
-/** Every crop weighs the variables the same way: rainfall first, then temperature. */
-const WEIGHTS: CropModel["weights"] = { elevation: 0.15, temp: 0.3, rain: 0.35, humidity: 0.2 };
 
 export const CROP_MODELS: Readonly<Record<CropId, CropModel>> = {
   // Maíz. Elevation: illustrative local approximation. Humidity: exploratory.
@@ -55,7 +53,7 @@ export const CROP_MODELS: Readonly<Record<CropId, CropModel>> = {
       rain: trapezoid(400, 600, 1200, 1800),
       humidity: trapezoid(30, 60, 80, 95),
     },
-    weights: WEIGHTS,
+    weights: { elevation: 0.1, temp: 0.3, rain: 0.45, humidity: 0.15 },
   },
   // Frijol rojo. Elevation: local favourable band, approximate outer limits. Humidity: local
   // favourable band, exploratory outer limits.
@@ -66,7 +64,7 @@ export const CROP_MODELS: Readonly<Record<CropId, CropModel>> = {
       rain: trapezoid(300, 500, 2000, 4300),
       humidity: trapezoid(50, 70, 80, 95),
     },
-    weights: WEIGHTS,
+    weights: { elevation: 0.15, temp: 0.35, rain: 0.3, humidity: 0.2 },
   },
   // Sorgo. Elevation: CENTA, 0–500 m favourable. Humidity: illustrative, pending validation.
   sorghum: {
@@ -76,7 +74,7 @@ export const CROP_MODELS: Readonly<Record<CropId, CropModel>> = {
       rain: trapezoid(300, 400, 600, 700),
       humidity: trapezoid(45, 60, 80, 95),
     },
-    weights: WEIGHTS,
+    weights: { elevation: 0.15, temp: 0.4, rain: 0.25, humidity: 0.2 },
   },
   // Caña de azúcar. Elevation: exploratory, 0–1,000 m favourable, 1,600 m limit. Humidity:
   // exploratory.
@@ -87,7 +85,7 @@ export const CROP_MODELS: Readonly<Record<CropId, CropModel>> = {
       rain: trapezoid(1000, 1500, 2000, 5000),
       humidity: trapezoid(40, 65, 85, 100),
     },
-    weights: WEIGHTS,
+    weights: { elevation: 0.05, temp: 0.25, rain: 0.55, humidity: 0.15 },
   },
 };
 
