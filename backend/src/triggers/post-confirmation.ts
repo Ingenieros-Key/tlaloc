@@ -1,6 +1,6 @@
 import { PostConfirmationTriggerHandler } from 'aws-lambda';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
-import { welcomeEmail } from './email-templates.js';
+import { welcomeEmail, resolveLang } from './email-templates.js';
 
 const ses = new SESv2Client({ region: process.env.REGION ?? 'us-east-1' });
 const SENDER = 'info@tlaloc.space';
@@ -11,7 +11,8 @@ const SENDER = 'info@tlaloc.space';
 export const handler: PostConfirmationTriggerHandler = async (event) => {
   const email = event.request.userAttributes.email;
   if (!email) return event;
-  const { subject, body } = welcomeEmail(email);
+  const lang = resolveLang(event.request.userAttributes.locale);
+  const { subject, body } = welcomeEmail(email, lang);
   try {
     await ses.send(
       new SendEmailCommand({
@@ -20,7 +21,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
         Content: {
           Simple: {
             Subject: { Data: subject },
-            Body: { Text: { Data: body } },
+            Body: { Html: { Data: body } },
           },
         },
       }),

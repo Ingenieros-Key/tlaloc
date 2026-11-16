@@ -7,9 +7,11 @@ export type DataStackProps = StackProps & {
 
 export type DataConfig = {
   readonly profilesTableName: string;
+  readonly plotsTableName: string;
   readonly mediaBucketName: string;
   readonly userPoolName: string;
   readonly userPoolClientName: string;
   readonly sesDomain: string;
   readonly sesSender: string;
+  readonly assetBaseUrl: string;
 };

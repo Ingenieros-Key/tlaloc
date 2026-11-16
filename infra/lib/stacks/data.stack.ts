@@ -9,6 +9,7 @@ import {
   aws_lambda_nodejs as nodejs,
   aws_logs as logs,
   aws_iam as iam,
+  CfnOutput,
 } from "aws-cdk-lib";
 import * as path from "path";
 import { DataStackProps } from "@stack-types/data.types";
@@ -32,9 +33,11 @@ const triggerBundlingExternals = [
 /** Stateful stack: DynamoDB profiles table, media bucket, Cognito user pool, SES domain identity. */
 export class DataStack extends Stack {
   public readonly profilesTable: dynamodb.Table;
+  public readonly plotsTable: dynamodb.Table;
   public readonly mediaBucket: s3.Bucket;
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly assetsBaseUrl: string;
 
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
@@ -47,6 +50,16 @@ export class DataStack extends Stack {
     this.profilesTable = new dynamodb.Table(this, "ProfilesTable", {
       tableName: dataConfig.profilesTableName,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy,
+    });
+
+    // Saved land plots per user (signed-in accounts): userId partition, plotId sort key.
+    this.plotsTable = new dynamodb.Table(this, "PlotsTable", {
+      tableName: dataConfig.plotsTableName,
+      partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "plotId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
       removalPolicy,
@@ -68,6 +81,11 @@ export class DataStack extends Stack {
         },
       ],
     });
+
+    // Email logo is served from the Amplify-hosted frontend, which is itself S3 behind
+    // CloudFront, so clients always load it. Per-env base URL (dev app domain / custom domain).
+    this.assetsBaseUrl = dataConfig.assetBaseUrl;
+    new CfnOutput(this, "AssetsBaseUrl", { value: this.assetsBaseUrl });
 
     this.userPool = new cognito.UserPool(this, "UserPool", {
       userPoolName: dataConfig.userPoolName,
@@ -120,7 +138,7 @@ export class DataStack extends Stack {
       });
     }
 
-    this.addCognitoTriggers(sesIdentityArn);
+    this.addCognitoTriggers(sesIdentityArn, this.assetsBaseUrl);
   }
 
   // ponytail: these trigger lambdas are stateless, but they live in this stateful stack
@@ -129,7 +147,7 @@ export class DataStack extends Stack {
   // the trigger functions, and their invoke permissions are created atomically, so Cognito
   // can validate trigger existence at pool-create time). Splitting them out reintroduces a
   // cross-stack deploy-order failure.
-  private addCognitoTriggers(sesIdentityArn: string): void {
+  private addCognitoTriggers(sesIdentityArn: string, assetsBaseUrl: string): void {
     const base = (name: string, entry: string) =>
       new nodejs.NodejsFunction(this, name, {
         functionName: buildName(name),
@@ -148,6 +166,9 @@ export class DataStack extends Stack {
 
     const customMessage = base("custom-message", "custom-message.ts");
     const postConfirmation = base("post-confirmation", "post-confirmation.ts");
+
+    customMessage.addEnvironment("TLALOC_ASSET_BASE_URL", assetsBaseUrl);
+    postConfirmation.addEnvironment("TLALOC_ASSET_BASE_URL", assetsBaseUrl);
 
     // SESv2's SendEmail has no CDK grant method on this grantee; the EmailIdentity's
     // grantSendEmail isn't reachable here, so scope a PolicyStatement to the one identity ARN.

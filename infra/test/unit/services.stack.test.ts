@@ -12,6 +12,7 @@ describe("ServicesStack", () => {
     baseConfig,
     env: { region: "us-east-1" },
     profilesTable: data.profilesTable,
+    plotsTable: data.plotsTable,
     mediaBucket: data.mediaBucket,
     userPool: data.userPool,
     userPoolClient: data.userPoolClient,

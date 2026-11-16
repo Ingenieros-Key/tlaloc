@@ -1,14 +1,23 @@
-# Hosts the static under-construction page (landing/) for now.
-# The Next.js app in frontend/ comes later — when ready, swap this for the
-# frontend build spec (see docs/runbooks/amplify-hosting.md, "frontend app" section).
+# Builds the Next.js app in frontend/ (static export) and serves frontend/out.
+# pnpm workspace via corepack. NEXT_PUBLIC_* env vars are baked at build time —
+# set them in the Amplify console (see docs/runbooks/amplify-hosting.md).
 version: 1
 frontend:
   phases:
+    preBuild:
+      commands:
+        - corepack enable
+        - corepack prepare pnpm@9.12.0 --activate
+        - pnpm install --frozen-lockfile
     build:
-      commands: []
+      commands:
+        - pnpm --filter frontend build
   artifacts:
-    baseDirectory: landing
+    baseDirectory: frontend/out
     files:
       - "**/*"
   cache:
-    paths: []
+    paths:
+      - node_modules/**/*
+      - frontend/node_modules/**/*
+      - frontend/.next/cache/**/*
