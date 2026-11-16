@@ -10,6 +10,8 @@ describe("loadEnv", () => {
 
   it("returns typed config when vars are present", () => {
     process.env.PROFILES_TABLE = "t";
+    process.env.PLOTS_TABLE = "p";
+    process.env.NOTIFICATIONS_TABLE = "n";
     process.env.MEDIA_BUCKET = "b";
     process.env.USER_POOL_ID = "u";
     process.env.USER_POOL_CLIENT_ID = "c";

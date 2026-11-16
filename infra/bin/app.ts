@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-import { App, Aspects, AspectPriority } from "aws-cdk-lib";
+import { App, Aspects, Tags } from "aws-cdk-lib";
 import { AwsSolutionsChecks, NagSuppressions } from "cdk-nag";
 import { baseConfig } from "@config/base.config";
 import { DataStack } from "@stacks/data.stack";
 import { ServicesStack } from "@stacks/services.stack";
-import { TaggingAspect } from "../lib/aspects/tagging-aspect";
 
 const app = new App();
 const env = { region: baseConfig.region };
@@ -14,16 +13,21 @@ const services = new ServicesStack(app, `${baseConfig.appPrefix}-services`, {
   baseConfig,
   env,
   profilesTable: data.profilesTable,
+  plotsTable: data.plotsTable,
+  notificationsTable: data.notificationsTable,
   mediaBucket: data.mediaBucket,
   userPool: data.userPool,
   userPoolClient: data.userPoolClient,
 });
 services.addStackDependency(data);
 
-// ponytail: TaggingAspect.visit() calls Tags.of().add(), which registers its own nested
-// MUTATING-priority (200) aspect; under aspectPrioritiesMutating, a nested aspect's priority
-// can't be lower than its invoker's, so TaggingAspect itself must also be MUTATING.
-Aspects.of(app).add(new TaggingAspect(), { priority: AspectPriority.MUTATING });
+// Apply tags via CDK's built-in Tag aspect (one well-behaved aspect) rather than a custom
+// IAspect that calls Tags.of().add() inside visit() — the latter registers nested aspects each
+// pass and, as the construct tree grows, never stabilizes (PossibleInfiniteLoopDetected).
+Tags.of(app).add("tenant", baseConfig.tenant);
+Tags.of(app).add("environment", baseConfig.env);
+Tags.of(app).add("service", baseConfig.tenant);
+
 Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 
 NagSuppressions.addStackSuppressions(data, [

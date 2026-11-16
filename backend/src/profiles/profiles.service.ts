@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { dynamoDoc } from '../common/aws/dynamo.client.js';
 import { s3 } from '../common/aws/s3.client.js';
@@ -20,12 +20,14 @@ export class ProfilesService {
     const existing = await dynamoDoc.send(
       new GetCommand({ TableName: this.env.profilesTable, Key: { userId } }),
     );
-    if (existing.Item) return existing.Item as Profile;
+    if (existing.Item) return this.withAvatarUrl(existing.Item as Profile);
 
+    const now = new Date().toISOString();
     const profile: Profile = {
       userId,
       email,
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
     await dynamoDoc.send(
       new PutCommand({ TableName: this.env.profilesTable, Item: profile }),
@@ -33,25 +35,57 @@ export class ProfilesService {
     return profile;
   }
 
+  // Only persists fields present in the DTO so partial updates (e.g. avatar-only
+  // or display-name-only) don't clobber the others.
   async update(userId: string, dto: UpdateProfileDto): Promise<Profile> {
-    const now = new Date().toISOString();
+    const sets = ['updatedAt = :u'];
+    const names: Record<string, string> = {};
+    const values: Record<string, unknown> = { ':u': new Date().toISOString() };
+
+    if (dto.displayName !== undefined) {
+      sets.push('displayName = :d');
+      values[':d'] = dto.displayName;
+    }
+    if (dto.bio !== undefined) {
+      sets.push('bio = :b');
+      values[':b'] = dto.bio;
+    }
+    if (dto.location !== undefined) {
+      sets.push('#loc = :l');
+      names['#loc'] = 'location';
+      values[':l'] = dto.location;
+    }
+    if (dto.avatarKey !== undefined) {
+      sets.push('avatarKey = :a');
+      values[':a'] = dto.avatarKey;
+    }
+
     const res = await dynamoDoc.send(
       new UpdateCommand({
         TableName: this.env.profilesTable,
         Key: { userId },
-        UpdateExpression:
-          'SET displayName = :d, bio = :b, #loc = :l, updatedAt = :u',
-        ExpressionAttributeNames: { '#loc': 'location' },
-        ExpressionAttributeValues: {
-          ':d': dto.displayName ?? null,
-          ':b': dto.bio ?? null,
-          ':l': dto.location ?? null,
-          ':u': now,
-        },
+        UpdateExpression: `SET ${sets.join(', ')}`,
+        ...(Object.keys(names).length
+          ? { ExpressionAttributeNames: names }
+          : {}),
+        ExpressionAttributeValues: values,
         ReturnValues: 'ALL_NEW',
       }),
     );
-    return res.Attributes as Profile;
+    return this.withAvatarUrl(res.Attributes as Profile);
+  }
+
+  private async withAvatarUrl(profile: Profile): Promise<Profile> {
+    if (!profile.avatarKey) return profile;
+    const avatarUrl = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: this.env.mediaBucket,
+        Key: profile.avatarKey,
+      }),
+      { expiresIn: 3600 },
+    );
+    return { ...profile, avatarUrl };
   }
 
   async avatarUploadUrl(

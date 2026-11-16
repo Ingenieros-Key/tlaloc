@@ -1,26 +1,160 @@
 @import "tailwindcss";
 
+/*
+ * Tlaloc design tokens: dark theme here (default), light theme below. Every component consumes
+ * these via Tailwind utilities (bg-surface, text-muted, border-line, ...). Never use raw hex in
+ * components.
+ *
+ * Dark surfaces use NASA blue's hue (#0B3D91, ~261° OKLCH) at low chroma (0.04–0.06), so panels
+ * read as blue without glowing and sit calmly on the grey dark basemap.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --tl-bg: #050b16;
+  --tl-surface: #0a1528;
+  --tl-surface-2: #0f1e38;
+  --tl-surface-3: #162847;
+  --tl-line: #22375a;
+  --tl-line-strong: #304b78;
+  --tl-text: #f4f0e6;
+  --tl-muted: #9eb0cc;
+  --tl-accent: #1fc8b4;
+  --tl-accent-strong: #0a7268;
+  --tl-on-accent: #050b16;
+  /* NASA blue, for brand moments; not a surface color. */
+  --tl-indigo: #0b3d91;
+  --tl-good: #5dbb63;
+  --tl-fair: #f6b93b;
+  --tl-poor: #f2724f;
+  /* Outline of form fields and chips: 3:1 against the surface (WCAG 1.4.11). */
+  --tl-input: #5b78aa;
+  --tl-overlay: rgb(5 11 22 / 0.72);
+
+  --tl-topbar-h: 60px;
+  --tl-ribbon-h: 72px;
+  --tl-browser-w: 272px;
+  /* The left tool rail: 44px buttons, 4px padding and a 1px border each side. */
+  --tl-rail-w: 54px;
+  --tl-inspector-w: 328px;
+
+  color-scheme: dark;
+}
+
+/* Light theme: toggled by adding .tl-light-theme to <html> (see lib/theme.ts). */
+html.tl-light-theme {
+  --tl-bg: #f4f0e6;
+  --tl-surface: #ffffff;
+  --tl-surface-2: #f3f1ea;
+  --tl-surface-3: #e9e6db;
+  --tl-line: #d8d3c4;
+  --tl-line-strong: #bcb6a3;
+  --tl-text: #0b1033;
+  --tl-muted: #5b6178;
+  --tl-accent: #0a7268;
+  --tl-accent-strong: #1fc8b4;
+  --tl-on-accent: #ffffff;
+  /* Status colors darkened for light surfaces: 5.3–6.6:1 as text on white (dark values fail). */
+  --tl-good: #276a2c;
+  --tl-fair: #8a5a00;
+  --tl-poor: #b3401f;
+  --tl-input: #8f8a78;
+  --tl-overlay: rgb(244 240 230 / 0.72);
+
+  color-scheme: light;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--tl-bg);
+  --color-surface: var(--tl-surface);
+  --color-surface-2: var(--tl-surface-2);
+  --color-surface-3: var(--tl-surface-3);
+  --color-line: var(--tl-line);
+  --color-line-strong: var(--tl-line-strong);
+  --color-text: var(--tl-text);
+  --color-muted: var(--tl-muted);
+  --color-accent: var(--tl-accent);
+  --color-accent-strong: var(--tl-accent-strong);
+  --color-on-accent: var(--tl-on-accent);
+  --color-indigo: var(--tl-indigo);
+  --color-good: var(--tl-good);
+  --color-fair: var(--tl-fair);
+  --color-poor: var(--tl-poor);
+  --color-input: var(--tl-input);
+  --color-overlay: var(--tl-overlay);
+
+  --font-display: var(--font-chakra), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--tl-bg);
+  color: var(--tl-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tl-accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * MapLibre chrome restyled to match the workspace. The canvas fills an overflow-hidden box, so its
+ * focus ring is drawn inside the edge instead of outside where it would be clipped. maplibre-gl.css
+ * loads after this file (with the map chunk), so overrides use an extra class for specificity.
+ */
+.maplibregl-map .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--tl-accent);
+  outline-offset: -2px;
+}
+.maplibregl-ctrl-attrib {
+  background: var(--tl-surface) !important;
+  color: var(--tl-muted) !important;
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--tl-muted) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+.maplibregl-map .maplibregl-ctrl-top-right {
+  max-width: calc(100% - 24px);
+}
+/* lg+: keep the attribution between the floating Browser and Inspector panels. */
+@media (min-width: 1024px) {
+  .maplibregl-map .maplibregl-ctrl-top-right {
+    right: calc(var(--tl-inspector-w) + 24px);
+    max-width: calc(100% - var(--tl-rail-w) - var(--tl-browser-w) - var(--tl-inspector-w) - 56px);
+  }
+}
+/* No Inspector on screen (no plot, Display closed): the attribution moves to the map's edge. */
+@media (min-width: 1024px) {
+  #workspace-canvas[data-inspector="hidden"] .maplibregl-map .maplibregl-ctrl-top-right {
+    right: 12px;
+    max-width: calc(100% - var(--tl-rail-w) - var(--tl-browser-w) - 44px);
+  }
 }

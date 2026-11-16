@@ -78,12 +78,18 @@ exports[`ServicesStack > matches snapshot 1`] = `
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-us-east-1",
           },
-          "S3Key": "ece93a030c9320f49920b8e608ad3d4cc2f2bf64aa43c54e32eff07afbd60ada.zip",
+          "S3Key": "4df4e9a4f95c31d27f99a8ab08eac2555031c83759c4706fdfd79829554a54be.zip",
         },
         "Environment": {
           "Variables": {
             "MEDIA_BUCKET": {
               "Fn::ImportValue": "D:ExportsOutputRefMediaBucketBCBB02BA270A7AEB",
+            },
+            "NOTIFICATIONS_TABLE": {
+              "Fn::ImportValue": "D:ExportsOutputRefNotificationsTable76DCFC6C32DE73EE",
+            },
+            "PLOTS_TABLE": {
+              "Fn::ImportValue": "D:ExportsOutputRefPlotsTableD8323BF66A1A6B70",
             },
             "PROFILES_TABLE": {
               "Fn::ImportValue": "D:ExportsOutputRefProfilesTable3B48B4C652559BF2",
@@ -191,6 +197,70 @@ exports[`ServicesStack > matches snapshot 1`] = `
               "Resource": [
                 {
                   "Fn::ImportValue": "D:ExportsOutputFnGetAttProfilesTable3B48B4C6Arn02770504",
+                },
+              ],
+            },
+            {
+              "Action": [
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "D:ExportsOutputFnGetAttPlotsTableD8323BF6ArnF4ADCFE2",
+                },
+              ],
+            },
+            {
+              "Action": [
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "D:ExportsOutputFnGetAttPlotsTableD8323BF6ArnF4ADCFE2",
+                },
+              ],
+            },
+            {
+              "Action": [
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "D:ExportsOutputFnGetAttNotificationsTable76DCFC6CArn012EC0C4",
+                },
+              ],
+            },
+            {
+              "Action": [
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "D:ExportsOutputFnGetAttNotificationsTable76DCFC6CArn012EC0C4",
                 },
               ],
             },

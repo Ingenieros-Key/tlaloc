@@ -13,6 +13,8 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 describe('ProfilesService', () => {
   const env = {
     profilesTable: 't',
+    plotsTable: 'p',
+    notificationsTable: 'n',
     mediaBucket: 'b',
     userPoolId: 'u',
     userPoolClientId: 'c',

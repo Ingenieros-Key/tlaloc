@@ -14,6 +14,8 @@ describe("cdk-nag", () => {
     baseConfig,
     env,
     profilesTable: data.profilesTable,
+    plotsTable: data.plotsTable,
+    notificationsTable: data.notificationsTable,
     mediaBucket: data.mediaBucket,
     userPool: data.userPool,
     userPoolClient: data.userPoolClient,

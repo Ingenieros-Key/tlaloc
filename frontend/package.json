@@ -9,13 +9,28 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@deck.gl/aggregation-layers": "9.4.1",
+    "@deck.gl/core": "^9.4.1",
+    "@deck.gl/layers": "^9.4.1",
+    "@deck.gl/maplibre": "~9.4.1",
+    "@tanstack/query-async-storage-persister": "^5.107.1",
+    "@tanstack/react-query": "^5.107.1",
+    "@tanstack/react-query-persist-client": "^5.107.1",
+    "@turf/turf": "^7.4.0",
+    "@watergis/maplibre-gl-terradraw": "^1.17.0",
     "aws-amplify": "^6.22.2",
+    "lucide-react": "^1.73.0",
+    "maplibre-gl": "^6.18.0",
+    "motion": "^14.14.0",
     "next": "16.4.6",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "terra-draw": "^1.39.0",
+    "terra-draw-maplibre-gl-adapter": "^1.5.0"
   },
   "devDependencies": {
-    "@tailwindcss/turbopack": "4.3.3",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/geojson": "7946.0.16",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

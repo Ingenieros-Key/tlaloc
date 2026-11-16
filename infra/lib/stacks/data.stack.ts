@@ -1,4 +1,4 @@
-import { Stack, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, RemovalPolicy, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import {
   aws_dynamodb as dynamodb,
@@ -9,6 +9,9 @@ import {
   aws_lambda_nodejs as nodejs,
   aws_logs as logs,
   aws_iam as iam,
+  aws_events as events,
+  aws_events_targets as targets,
+  CfnOutput,
 } from "aws-cdk-lib";
 import * as path from "path";
 import { DataStackProps } from "@stack-types/data.types";
@@ -32,9 +35,12 @@ const triggerBundlingExternals = [
 /** Stateful stack: DynamoDB profiles table, media bucket, Cognito user pool, SES domain identity. */
 export class DataStack extends Stack {
   public readonly profilesTable: dynamodb.Table;
+  public readonly plotsTable: dynamodb.Table;
+  public readonly notificationsTable: dynamodb.Table;
   public readonly mediaBucket: s3.Bucket;
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly assetsBaseUrl: string;
 
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
@@ -46,6 +52,27 @@ export class DataStack extends Stack {
 
     this.profilesTable = new dynamodb.Table(this, "ProfilesTable", {
       tableName: dataConfig.profilesTableName,
+      partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy,
+    });
+
+    // Saved land plots per user (signed-in accounts): userId partition, plotId sort key.
+    this.plotsTable = new dynamodb.Table(this, "PlotsTable", {
+      tableName: dataConfig.plotsTableName,
+      partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "plotId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy,
+    });
+
+    // Email-reminder preferences per user: userId partition. Record also carries the
+    // user's email + locale (stamped at save time) so the scheduled reminder Lambda can
+    // fan out without a per-user Cognito lookup.
+    this.notificationsTable = new dynamodb.Table(this, "NotificationsTable", {
+      tableName: dataConfig.notificationsTableName,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
@@ -68,6 +95,11 @@ export class DataStack extends Stack {
         },
       ],
     });
+
+    // Email logo is served from the Amplify-hosted frontend, which is itself S3 behind
+    // CloudFront, so clients always load it. Per-env base URL (dev app domain / custom domain).
+    this.assetsBaseUrl = dataConfig.assetBaseUrl;
+    new CfnOutput(this, "AssetsBaseUrl", { value: this.assetsBaseUrl });
 
     this.userPool = new cognito.UserPool(this, "UserPool", {
       userPoolName: dataConfig.userPoolName,
@@ -120,7 +152,48 @@ export class DataStack extends Stack {
       });
     }
 
-    this.addCognitoTriggers(sesIdentityArn);
+    this.addCognitoTriggers(sesIdentityArn, this.assetsBaseUrl);
+    this.addReminderSchedule(sesIdentityArn, this.assetsBaseUrl);
+  }
+
+  // Scheduled reminder fan-out lives here with the notifications table (its data source)
+  // and the SES identity grant. Daily EventBridge rule; the handler reads recipient email +
+  // locale straight off each prefs record, so no Cognito/profiles access is needed.
+  private addReminderSchedule(sesIdentityArn: string, assetsBaseUrl: string): void {
+    const fn = new nodejs.NodejsFunction(this, "ReminderFn", {
+      functionName: buildName("reminder"),
+      entry: path.join(triggerDir, "reminder.ts"),
+      handler: "handler",
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      timeout: Duration.seconds(60),
+      logGroup: new logs.LogGroup(this, "reminder-logs", {
+        logGroupName: `/aws/lambda/${buildName("reminder")}`,
+        retention: logs.RetentionDays.TWO_WEEKS,
+        removalPolicy: RemovalPolicy.DESTROY,
+      }),
+      tracing: lambda.Tracing.ACTIVE,
+      bundling: { minify: true, externalModules: triggerBundlingExternals },
+      environment: {
+        NOTIFICATIONS_TABLE: this.notificationsTable.tableName,
+        TLALOC_ASSET_BASE_URL: assetsBaseUrl,
+        REGION: this.region,
+      },
+    });
+
+    this.notificationsTable.grantReadData(fn);
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail"],
+        resources: [sesIdentityArn],
+      }),
+    );
+
+    new events.Rule(this, "ReminderSchedule", {
+      ruleName: buildName("reminder"),
+      schedule: events.Schedule.rate(Duration.days(1)),
+      targets: [new targets.LambdaFunction(fn)],
+    });
   }
 
   // ponytail: these trigger lambdas are stateless, but they live in this stateful stack
@@ -129,7 +202,7 @@ export class DataStack extends Stack {
   // the trigger functions, and their invoke permissions are created atomically, so Cognito
   // can validate trigger existence at pool-create time). Splitting them out reintroduces a
   // cross-stack deploy-order failure.
-  private addCognitoTriggers(sesIdentityArn: string): void {
+  private addCognitoTriggers(sesIdentityArn: string, assetsBaseUrl: string): void {
     const base = (name: string, entry: string) =>
       new nodejs.NodejsFunction(this, name, {
         functionName: buildName(name),
@@ -148,6 +221,9 @@ export class DataStack extends Stack {
 
     const customMessage = base("custom-message", "custom-message.ts");
     const postConfirmation = base("post-confirmation", "post-confirmation.ts");
+
+    customMessage.addEnvironment("TLALOC_ASSET_BASE_URL", assetsBaseUrl);
+    postConfirmation.addEnvironment("TLALOC_ASSET_BASE_URL", assetsBaseUrl);
 
     // SESv2's SendEmail has no CDK grant method on this grantee; the EmailIdentity's
     // grantSendEmail isn't reachable here, so scope a PolicyStatement to the one identity ARN.

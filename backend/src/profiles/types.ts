@@ -5,5 +5,7 @@ export type Profile = {
   readonly bio?: string;
   readonly location?: string;
   readonly avatarKey?: string;
+  readonly avatarUrl?: string;
+  readonly createdAt?: string;
   readonly updatedAt: string;
 };
