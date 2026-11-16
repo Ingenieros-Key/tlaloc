@@ -148,10 +148,12 @@ export const rotation = {
     title: "Rotation plans",
     close: "Close rotation plans",
     rain: "Rain by month",
-    rainSource: "NASA, expected (5-year average)",
+    rainSource: "NASA measured; dashed: predicted",
     rainLoading: "Loading rainfall",
-    rainLabel: (wettest: string, driest: string) =>
-      `Expected monthly rainfall at the plot (5-year average): wettest in ${wettest}, driest in ${driest}`,
+    rainLabel: (from: string, to: string, first: number) =>
+      `Monthly rainfall at the plot: measured by NASA before ${from}, then ${from} to ${to} predicted, each month from the trend of that month since ${first}, kept within the lowest and highest it has had.`,
+    rainBar: (month: string, mm: number, predicted: boolean) =>
+      predicted ? `${month}: ${mm} mm predicted (trend of past years)` : `${month}: ${mm} mm measured`,
     today: "Today",
     planted: "Outlined: what you planted",
     lane: (n: number) => `Plan ${n}`,

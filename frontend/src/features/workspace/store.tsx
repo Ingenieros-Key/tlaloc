@@ -157,11 +157,6 @@ export type WorkspaceState = {
   readonly rotationSeasons: number;
   /** The plan lanes dock is open; it takes the timeline's place (see `lanesVisible`). */
   readonly lanesOpen: boolean;
-  /**
-   * Expected rainfall per calendar month (0 = January) at the plot: each month's average over the
-   * climate years (the projection the rotation's rain bars show). Null until loaded.
-   */
-  readonly plotRain: readonly number[] | null;
   /** The plot's monthly climate cycles and projection (the Climate tab); see `PlotCycles`. */
   readonly plotCycles: PlotCycles;
   readonly analysis: AnalysisState;
@@ -188,7 +183,7 @@ export type WorkspaceState = {
 /** What the reducer owns: everything except state derived from queries. */
 type ReducerState = Omit<
   WorkspaceState,
-  "layerData" | "layerDataB" | "timelineLayer" | "timelineData" | "scoreData" | "plotRain" | "plotCycles"
+  "layerData" | "layerDataB" | "timelineLayer" | "timelineData" | "scoreData" | "plotCycles"
 >;
 
 export type WorkspaceAction =
@@ -634,10 +629,6 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
     () => (plotClimate.status === "ready" ? { status: "ready", cycles: plotClimate.cycles } : { status: plotClimate.status }),
     [plotClimate],
   );
-  const plotRain = useMemo(
-    () => (plotCycles.status === "ready" ? plotCycles.cycles.factors.rain.mean.map((v) => v ?? 0) : null),
-    [plotCycles],
-  );
   // Elevation has no days: as the active layer of a two-layer view, the timeline follows the other.
   const { activeLayer, secondLayer, viewMode } = state;
   const timelineFromB = activeLayer === "elevation" && isTwoLayerMode(viewMode) && isPowerLayer(secondLayer);
@@ -648,8 +639,8 @@ export function WorkspaceProvider({ children }: { readonly children: ReactNode }
       : null;
   const timelineData = timelineFromB ? layerDataB : layerData;
   const value = useMemo<WorkspaceState>(
-    () => ({ ...state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain, plotCycles }),
-    [state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotRain, plotCycles],
+    () => ({ ...state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotCycles }),
+    [state, layerData, layerDataB, timelineLayer, timelineData, scoreData, plotCycles],
   );
 
   const { precipPlaying, precipSpeed } = state;

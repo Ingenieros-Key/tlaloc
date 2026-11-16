@@ -77,6 +77,38 @@ export function projectedMonths(start: YearMonth): readonly YearMonth[] {
   });
 }
 
+/** A factor's measured value for one month, from the averaged years or the latest ones; null if none. */
+export function measuredValue(cycle: FactorCycle, { year, month }: YearMonth): number | null {
+  const fromYears = cycle.years.find((y) => y.year === year)?.values[month - 1];
+  if (fromYears !== undefined) return fromYears;
+  const recent = cycle.recent[month - 1];
+  return recent && recent.year === year ? recent.value : null;
+}
+
+/**
+ * A month predicted by linear regression over the same calendar month in past years: the averaged
+ * years plus its latest measured value when that is newer (this year's, for a month already past).
+ * The least-squares line through (year, value) is read at the target year, then kept within the
+ * lowest and highest value that month has had, so a steep trend over few years cannot run to zero
+ * or past any month seen. Keeps the season (a December stays dry); null without data.
+ */
+export function trendForecast(cycle: FactorCycle, { year, month }: YearMonth): number | null {
+  const points = cycle.years.flatMap((y) => {
+    const value = y.values[month - 1];
+    return value === null ? [] : [{ x: y.year, y: value }];
+  });
+  const recent = cycle.recent[month - 1];
+  if (recent && !points.some((p) => p.x === recent.year)) points.push({ x: recent.year, y: recent.value });
+  if (points.length === 0) return null;
+  const meanX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+  const meanY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+  const spread = points.reduce((sum, p) => sum + (p.x - meanX) ** 2, 0);
+  const slope = spread === 0 ? 0 : points.reduce((sum, p) => sum + (p.x - meanX) * (p.y - meanY), 0) / spread;
+  const low = Math.min(...points.map((p) => p.y));
+  const high = Math.max(...points.map((p) => p.y));
+  return Math.min(high, Math.max(low, meanY + slope * (year - meanX)));
+}
+
 /** A month counts as wet from this much usual rainfall (mm). */
 export const WET_MONTH_MM = 100;
 

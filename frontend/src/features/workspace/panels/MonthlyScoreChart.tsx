@@ -26,7 +26,8 @@ const PAD = { left: 18, right: 2, top: 4, bottom: 13 } as const;
 /**
  * A crop's viability month by month across the climate years, each month scored on the 12 months
  * ending with it, over bands for Primera, Postrera and the dry season. Dashed lines mark the
- * Good and Fair thresholds.
+ * Good and Fair thresholds. Months not measured yet run on dashed, through the next 12: their
+ * windows fill the unmeasured months with the 5-year monthly averages.
  */
 export function MonthlyScoreChart({ crop, months }: { readonly crop: string; readonly months: readonly MonthScore[] }) {
   const [active, setActive] = useState<number | null>(null);
@@ -35,18 +36,27 @@ export function MonthlyScoreChart({ crop, months }: { readonly crop: string; rea
   const step = (W - PAD.left - PAD.right) / months.length;
   const x = (i: number) => PAD.left + (i + 0.5) * step;
   const y = (score: number) => PAD.top + (1 - score / 100) * (H - PAD.top - PAD.bottom);
-  let d = "";
-  months.forEach(({ score }, i) => {
-    if (score === null) {
-      d += " ";
-      return;
-    }
-    d += `${d === "" || d.endsWith(" ") ? "M" : "L"}${x(i).toFixed(1)},${y(score).toFixed(1)}`;
-  });
+  // The projected line starts at the last measured point, so the two lines join.
+  const firstProjected = months.findIndex((m) => m.projected);
+  const path = (include: (m: MonthScore, i: number) => boolean) => {
+    let d = "";
+    months.forEach((m, i) => {
+      if (m.score === null || !include(m, i)) {
+        d += " ";
+        return;
+      }
+      d += `${d === "" || d.endsWith(" ") ? "M" : "L"}${x(i).toFixed(1)},${y(m.score).toFixed(1)}`;
+    });
+    return d.trim();
+  };
+  const measuredPath = path((m) => !m.projected);
+  const projectedPath = firstProjected < 0 ? "" : path((m, i) => m.projected || i === firstProjected - 1);
 
-  const scored = months.filter((m): m is MonthScore & { score: number } => m.score !== null);
+  const scored = months.filter((m): m is MonthScore & { score: number } => m.score !== null && !m.projected);
   const low = scored.reduce((min, m) => (m.score < min.score ? m : min), scored[0]);
   const high = scored.reduce((max, m) => (m.score > max.score ? m : max), scored[0]);
+  const last = months.at(-1);
+  const end = last?.projected && last.score !== null ? last : null;
   const label = (m: MonthScore) => `${t.rotation.monthShort(m.month)} ${m.year}`;
   const seasonLabel = (month: number) => {
     const name = seasonOfMonth(month);
@@ -55,7 +65,12 @@ export function MonthlyScoreChart({ crop, months }: { readonly crop: string; rea
 
   const current = active === null ? null : months[active];
   const readout = current
-    ? s.readout(label(current), current.score === null ? s.noScore : String(current.score), seasonLabel(current.month))
+    ? s.readout(
+        label(current),
+        current.score === null ? s.noScore : String(current.score),
+        seasonLabel(current.month),
+        current.projected,
+      )
     : low && high
       ? s.range(String(low.score), label(low), String(high.score), label(high))
       : "";
@@ -73,7 +88,12 @@ export function MonthlyScoreChart({ crop, months }: { readonly crop: string; rea
         viewBox={`0 0 ${W} ${H}`}
         className="mt-1 block w-full"
         role="img"
-        aria-label={s.chartLabel(crop, low ? `${low.score} (${label(low)})` : "", high ? `${high.score} (${label(high)})` : "")}
+        aria-label={s.chartLabel(
+          crop,
+          low ? `${low.score} (${label(low)})` : "",
+          high ? `${high.score} (${label(high)})` : "",
+          end ? `${end.score} (${label(end)})` : null,
+        )}
         onMouseLeave={() => setActive(null)}
       >
         {months.map((m, i) => {
@@ -105,7 +125,36 @@ export function MonthlyScoreChart({ crop, months }: { readonly crop: string; rea
             </text>
           </g>
         ))}
-        <path d={d.trim()} fill="none" className="stroke-text" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+        {firstProjected > 0 ? (
+          <g>
+            <line
+              x1={PAD.left + firstProjected * step}
+              x2={PAD.left + firstProjected * step}
+              y1={PAD.top}
+              y2={H - PAD.bottom}
+              className="stroke-muted"
+              strokeWidth="1"
+            />
+            <text
+              x={PAD.left + firstProjected * step + 2}
+              y={PAD.top + 7}
+              className="fill-muted text-[8px]"
+            >
+              {s.projected}
+            </text>
+          </g>
+        ) : null}
+        <path d={measuredPath} fill="none" className="stroke-text" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+        {projectedPath ? (
+          <path
+            d={projectedPath}
+            fill="none"
+            className="stroke-text"
+            strokeWidth="1.5"
+            strokeDasharray="3 2"
+            strokeLinejoin="round"
+          />
+        ) : null}
         {current && current.score !== null ? (
           <>
             <line x1={x(active!)} x2={x(active!)} y1={PAD.top} y2={H - PAD.bottom} className="stroke-text/40" strokeWidth="1" />
@@ -164,6 +213,12 @@ export function SeasonBandsLegend() {
           <line x1="0" y1="5" x2="14" y2="5" className="stroke-line-strong" strokeDasharray="2 2" />
         </svg>
         {s.thresholds}
+      </li>
+      <li className="flex items-center gap-1.5">
+        <svg aria-hidden="true" width="14" height="10">
+          <line x1="0" y1="5" x2="14" y2="5" className="stroke-text" strokeWidth="1.5" strokeDasharray="3 2" />
+        </svg>
+        {s.projectedKey}
       </li>
     </ul>
   );

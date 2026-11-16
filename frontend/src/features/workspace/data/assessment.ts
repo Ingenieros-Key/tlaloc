@@ -106,9 +106,10 @@ export function computeAssessment(
       const result = scoreCrop(id, { ...year.values, elevation: height });
       return result ? [{ year: year.year, score: result.score, rating: result.rating }] : [];
     });
-    const months = (climate?.months ?? []).map(({ year, month, values: monthValues }) => ({
+    const months = (climate?.months ?? []).map(({ year, month, projected, values: monthValues }) => ({
       year,
       month,
+      projected,
       score: scoreCrop(id, { ...monthValues, elevation: height })?.score ?? null,
     }));
     return [{ ...average, years, months }];
