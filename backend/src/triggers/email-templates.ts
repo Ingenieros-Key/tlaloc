@@ -178,3 +178,51 @@ export function welcomeEmail(_email: string, lang: Lang = 'en'): { subject: stri
     body: shell({ lang, preheader: c.preheader, blocks: c.blocks, cta: { url: SITE_URL, label: c.cta } }),
   };
 }
+
+export type ReminderType = 'rotation' | 'irrigation';
+
+const reminderCopy: Record<ReminderType, Record<Lang, { subject: string; preheader: string; title: string; body: string; cta: string }>> = {
+  rotation: {
+    en: {
+      subject: 'Time to review your crop rotation',
+      preheader: 'A crop-rotation check-in from Tlaloc',
+      title: 'Crop rotation reminder',
+      body: `Rotating what you plant protects your soil and keeps pests and disease in check. Open Tlaloc to review which crop best fits your land and the season ahead.`,
+      cta: 'Review rotation',
+    },
+    es: {
+      subject: 'Es hora de revisar tu rotación de cultivos',
+      preheader: 'Un recordatorio de rotación de cultivos de Tlaloc',
+      title: 'Recordatorio de rotación de cultivos',
+      body: `Rotar lo que siembras protege tu suelo y mantiene a raya plagas y enfermedades. Abre Tlaloc para revisar qué cultivo se adapta mejor a tu terreno y a la temporada que viene.`,
+      cta: 'Revisar rotación',
+    },
+  },
+  irrigation: {
+    en: {
+      subject: 'Time to check your irrigation plan',
+      preheader: 'An irrigation check-in from Tlaloc',
+      title: 'Irrigation reminder',
+      body: `Keep your watering in step with the forecast. Open Tlaloc to review your irrigation plan against the conditions ahead and avoid over- or under-watering.`,
+      cta: 'Review irrigation',
+    },
+    es: {
+      subject: 'Es hora de revisar tu plan de riego',
+      preheader: 'Un recordatorio de riego de Tlaloc',
+      title: 'Recordatorio de riego',
+      body: `Mantén tu riego en sintonía con el pronóstico. Abre Tlaloc para revisar tu plan de riego frente a las condiciones que vienen y evitar regar de más o de menos.`,
+      cta: 'Revisar riego',
+    },
+  },
+};
+
+export function reminderEmail(type: ReminderType, lang: Lang = 'en'): { subject: string; body: string } {
+  const c = reminderCopy[type][lang];
+  const blocks = `
+      <h2 style="margin:0 0 10px;font-family:${DISPLAY_FONT};font-size:22px;color:${COLORS.noche};">${c.title}</h2>
+      <p style="margin:0;">${c.body}</p>`;
+  return {
+    subject: c.subject,
+    body: shell({ lang, preheader: c.preheader, blocks, cta: { url: SITE_URL, label: c.cta } }),
+  };
+}

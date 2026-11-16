@@ -2,6 +2,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Layer, PickingInfo } from "@deck.gl/core";
+import { IconLayer } from "@deck.gl/layers";
 import { MapLibreOverlay } from "@deck.gl/maplibre";
 import { CloudOff, LoaderCircle, Sun, X } from "lucide-react";
 import {
@@ -45,6 +46,7 @@ import {
 import { CompareDivider, type DividerMove } from "./CompareDivider";
 import { DATA_LAYER_B_ID, DATA_LAYER_ID, buildDeckLayers, deckGroupId, type SplitLine } from "./deckLayers";
 import { PlotMapLabel, type PlotBestCrop, type PlotReading } from "./PlotMapLabel";
+import { getPins, selectPin, usePlotPins, type PlotPin } from "./plotPins";
 import { MAP_CONTAINER_ID } from "./focus";
 import {
   COUNTRY_BOUNDS,
@@ -138,7 +140,7 @@ function deckLayersFor(
   theme: Theme,
 ): Layer[] {
   if (globe) return [];
-  return buildDeckLayers({
+  const layers = buildDeckLayers({
     field: data.a,
     fieldB: data.b,
     score: data.score,
@@ -162,6 +164,41 @@ function deckLayersFor(
     beforeId,
     display: s.display,
   });
+  const pins = getPins();
+  if (pins.length > 0) layers.push(plotPinLayer(pins, beforeId));
+  return layers;
+}
+
+/** A MapPin teardrop (accent jade) whose tip sits on the coordinate; click loads that saved plot. */
+const PIN_ICON = {
+  url:
+    "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">` +
+        `<path d="M18 2C9.7 2 3 8.7 3 17c0 10.9 15 29 15 29s15-18.1 15-29C33 8.7 26.3 2 18 2Z" fill="#1FC8B4" stroke="#0b1016" stroke-width="2"/>` +
+        `<circle cx="18" cy="17" r="5.5" fill="#0b1016"/>` +
+        `</svg>`,
+    ),
+  width: 36,
+  height: 48,
+  anchorY: 48,
+};
+
+function plotPinLayer(pins: readonly PlotPin[], beforeId: string | undefined): Layer {
+  return new IconLayer<PlotPin>({
+    id: "tl-plot-pins",
+    beforeId,
+    data: pins,
+    getPosition: (p) => [p.lngLat[0], p.lngLat[1]],
+    getIcon: () => PIN_ICON,
+    getSize: 40,
+    sizeUnits: "pixels",
+    pickable: true,
+    onClick: ({ object }) => {
+      if (object) selectPin(object.plotId);
+      return true;
+    },
+  } as ConstructorParameters<typeof IconLayer<PlotPin>>[0] & { beforeId?: string });
 }
 
 /** Heatmap hover: the cell whose centre is nearest the pointer, if one is within about 4 km. */
@@ -677,6 +714,15 @@ export function MapView() {
       layers: deckLayersFor(stateRef.current, dataRef.current, beforeId, globeActive, theme),
     });
   }, [globeActive, activeLayer, secondLayer, viewMode, layerSettings, dataStyle, sizedZoom, beforeId, display, theme, basemap, state.focus, state.plot]);
+
+  // Saved-plot pins come from a module store (useSavedPlots publishes them). Re-push the deck layers
+  // whenever the set of pins changes; deckLayersFor reads them fresh.
+  const pins = usePlotPins();
+  useEffect(() => {
+    overlayRef.current?.setProps({
+      layers: deckLayersFor(stateRef.current, dataRef.current, beforeIdRef.current, globeRef.current, themeRef.current),
+    });
+  }, [pins]);
 
   // Crop score view: one static field per crop.
   useEffect(() => {

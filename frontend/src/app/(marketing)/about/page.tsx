@@ -47,7 +47,7 @@ export default function AboutPage() {
       id: "nasa",
       style: { top: "-18px", right: "-18px" },
       bg: "bg-white",
-      node: <img src="/nasa-logo.png" alt="" className="h-full w-full object-contain p-1" />,
+      node: <img src="/nasa-logo.png" alt="" className="h-9 w-9 shrink-0 object-contain" />,
       tip: t.stickers.nasa,
     },
     {

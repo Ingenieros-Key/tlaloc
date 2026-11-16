@@ -2,8 +2,10 @@
  * Send a rendered email template to yourself to preview formatting.
  *
  *   pnpm --filter backend email:test -- --to you@example.com --template welcome
+ *   pnpm --filter backend email:test -- --to you@example.com --template reminder --type irrigation --lang es
  *
- * --template: confirm | reset | welcome (default: welcome)
+ * --template: confirm | reset | welcome | reminder (default: welcome)
+ * --type:     rotation | irrigation (reminder template only; default rotation)
  * --to:       recipient (required; must be SES-verified if the account is in sandbox)
  * --from:     sender (default info@tlaloc.space; must be a verified identity)
  *
@@ -14,6 +16,7 @@ import {
   confirmationEmail,
   passwordResetEmail,
   welcomeEmail,
+  reminderEmail,
 } from '../src/triggers/email-templates.js';
 
 function arg(name: string): string | undefined {
@@ -22,7 +25,8 @@ function arg(name: string): string | undefined {
 }
 
 const to = arg('to');
-const template = (arg('template') ?? 'welcome') as 'confirm' | 'reset' | 'welcome';
+const template = (arg('template') ?? 'welcome') as 'confirm' | 'reset' | 'welcome' | 'reminder';
+const type = (arg('type') ?? 'rotation') === 'irrigation' ? 'irrigation' : 'rotation';
 const lang = (arg('lang') ?? 'en') === 'es' ? 'es' : 'en';
 const from = arg('from') ?? 'info@tlaloc.space';
 const region = process.env.REGION ?? 'us-east-1';
@@ -37,7 +41,9 @@ const rendered =
     ? confirmationEmail('123456', lang)
     : template === 'reset'
       ? passwordResetEmail('123456', lang)
-      : welcomeEmail(to, lang);
+      : template === 'reminder'
+        ? reminderEmail(type, lang)
+        : welcomeEmail(to, lang);
 
 const ses = new SESv2Client({ region });
 

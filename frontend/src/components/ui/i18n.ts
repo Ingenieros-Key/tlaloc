@@ -33,6 +33,11 @@ export const navCopy: Record<Lang, {
   theme: string;
   language: string;
   menu: string;
+  notifications: string;
+  notificationsSub: string;
+  rotationReminders: string;
+  irrigationReminders: string;
+  close: string;
 }> = {
   en: {
     home: "Home",
@@ -45,6 +50,11 @@ export const navCopy: Record<Lang, {
     theme: "Theme",
     language: "Language",
     menu: "Menu",
+    notifications: "Notifications",
+    notificationsSub: "Choose which email reminders you'd like to receive.",
+    rotationReminders: "Crop rotation reminders",
+    irrigationReminders: "Irrigation reminders",
+    close: "Close",
   },
   es: {
     home: "Inicio",
@@ -57,6 +67,11 @@ export const navCopy: Record<Lang, {
     theme: "Tema",
     language: "Idioma",
     menu: "Menú",
+    notifications: "Notificaciones",
+    notificationsSub: "Elige qué recordatorios por correo quieres recibir.",
+    rotationReminders: "Recordatorios de rotación de cultivos",
+    irrigationReminders: "Recordatorios de riego",
+    close: "Cerrar",
   },
 };
 

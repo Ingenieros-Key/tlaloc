@@ -10,6 +10,7 @@ import { Panel } from "../ui/Panel";
 import { Segmented } from "../ui/Segmented";
 import { ClimateTab } from "./ClimateTab";
 import { CropCard } from "./CropCard";
+import { IrrigationCard } from "./IrrigationCard";
 import { SeasonBandsLegend } from "./MonthlyScoreChart";
 import { DisplayPanel } from "./DisplayPanel";
 import { formatCentroid, formatHectares, formatSquareMeters } from "./format";
@@ -21,7 +22,7 @@ import { RotationTab } from "./RotationTab";
  * `inspectorVisible`).
  */
 export function InspectorPanel() {
-  const { plotSummary, plotName, analysis, inspectorView, inspectorTab } = useWorkspace();
+  const { plotSummary, plotName, planting, analysis, inspectorView, inspectorTab } = useWorkspace();
   const dispatch = useWorkspaceDispatch();
   const showDisplay = inspectorView === "display";
   const title = showDisplay ? t.inspector.display.title : t.inspector.title;
@@ -80,6 +81,11 @@ export function InspectorPanel() {
                 <Outlook analysis={analysis} />
               </Section>
             )}
+          </div>
+        ) : null}
+        {plotSummary && planting?.crop && planting.crop !== "other" ? (
+          <div className="px-3 py-3">
+            <IrrigationCard />
           </div>
         ) : null}
       </div>

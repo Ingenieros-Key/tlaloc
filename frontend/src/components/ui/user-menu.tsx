@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { LogOut, User, UserCircle2 } from "lucide-react";
+import { Bell, LogOut, User, UserCircle2 } from "lucide-react";
 import { useLang } from "@/lib/i18n-store";
 import { navCopy } from "./i18n";
+import { NotificationsMenu } from "./notifications-menu";
 
 export function UserMenu({
   firstName,
@@ -17,6 +18,7 @@ export function UserMenu({
 }) {
   const t = navCopy[useLang()];
   const [open, setOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,6 +68,18 @@ export function UserMenu({
             role="menuitem"
             onClick={() => {
               setOpen(false);
+              setNotifOpen(true);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-text transition-colors hover:bg-surface-3"
+          >
+            <Bell className="h-4 w-4" strokeWidth={1.75} />
+            {t.notifications}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
               onSignOut();
             }}
             className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-text transition-colors hover:bg-surface-3"
@@ -75,6 +89,7 @@ export function UserMenu({
           </button>
         </div>
       )}
+      <NotificationsMenu open={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

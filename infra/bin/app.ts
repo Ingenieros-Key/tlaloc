@@ -14,6 +14,7 @@ const services = new ServicesStack(app, `${baseConfig.appPrefix}-services`, {
   env,
   profilesTable: data.profilesTable,
   plotsTable: data.plotsTable,
+  notificationsTable: data.notificationsTable,
   mediaBucket: data.mediaBucket,
   userPool: data.userPool,
   userPoolClient: data.userPoolClient,
