@@ -23,8 +23,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Tlaloc",
-  description: "Tlaloc — adaptando la agricultura con datos de la NASA. Sitio en construcción.",
-  icons: { icon: "/favicon.svg" },
+  description: "Tlaloc — adaptando la agricultura con datos de la NASA.",
 };
 
 export const viewport: Viewport = {
