@@ -36,11 +36,21 @@ function yearList({ first, last }: ClimateYears): readonly number[] {
 /** One year's values at a place; a factor POWER has no annual value for is left out. */
 export type ClimateYear = { readonly year: number; readonly values: Partial<Record<ClimateFactor, number>> };
 
+/** One month's rolling 12-month climate: the 12 months ending with it (`month` is 1–12). */
+export type ClimateMonth = {
+  readonly year: number;
+  readonly month: number;
+  /** Rain total, mean temperature and humidity over those 12 months; a factor missing any month is left out. */
+  readonly values: Partial<Record<ClimateFactor, number>>;
+};
+
 export type Climate = {
   /** Each factor's average over the years it has a value for. */
   readonly mean: Partial<Record<ClimateFactor, number>>;
   /** Every year with at least one value, oldest first. */
   readonly years: readonly ClimateYear[];
+  /** Every month of the averaged years, oldest first, with its rolling 12-month climate. */
+  readonly months: readonly ClimateMonth[];
 };
 
 function annualValue(location: PowerLocation, factor: ClimateFactor, year: number): number | null {
@@ -70,7 +80,39 @@ export function climateAt(location: PowerLocation, range: ClimateYears): Climate
     const value = mean(years.map((year) => year.values[factor] ?? null));
     if (value !== null) averages[factor] = value;
   }
-  return { mean: averages, years };
+  return { mean: averages, years, months: rollingMonths(location, range) };
+}
+
+function monthValue(location: PowerLocation, factor: ClimateFactor, year: number, month: number): number | null {
+  const value = location.series[CLIMATE_PARAMETERS[factor]]?.[`${year}${String(month).padStart(2, "0")}`];
+  return value === undefined || value === null || !Number.isFinite(value) ? null : value;
+}
+
+/**
+ * Each month of the averaged years scored the way the annual ranges expect: the rainfall total and
+ * the mean temperature and humidity of the 12 months ending with it (so January 2021 reads
+ * February 2020 to January 2021; the request starts a year early for that).
+ */
+function rollingMonths(location: PowerLocation, range: ClimateYears): readonly ClimateMonth[] {
+  const months: ClimateMonth[] = [];
+  for (let year = range.first; year <= range.last; year += 1) {
+    for (let month = 1; month <= 12; month += 1) {
+      const values: Partial<Record<ClimateFactor, number>> = {};
+      for (const factor of CLIMATE_FACTORS) {
+        const window: number[] = [];
+        for (let back = 11; back >= 0; back -= 1) {
+          const index = year * 12 + (month - 1) - back;
+          const value = monthValue(location, factor, Math.floor(index / 12), (index % 12) + 1);
+          if (value !== null) window.push(value);
+        }
+        if (window.length < 12) continue;
+        const total = window.reduce((sum, v) => sum + v, 0);
+        values[factor] = factor === "rain" ? total : total / 12;
+      }
+      months.push({ year, month, values });
+    }
+  }
+  return months;
 }
 
 /** One factor's multi-year average on the hexagon grid, from a regional answer (NaN = no data). */
@@ -83,15 +125,16 @@ export function climateField(data: readonly PowerLocation[], factor: ClimateFact
 }
 
 /**
- * The plot's request: every factor's monthly and annual values at the point, from the first averaged
- * year through the current one (whose published months are the cycles' most recent values).
+ * The plot's request: every factor's monthly and annual values at the point, from the year before
+ * the first averaged one (for the first months' rolling windows) through the current one (whose
+ * published months are the cycles' most recent values).
  */
 export function climatePointQuery([lng, lat]: readonly [number, number], range: ClimateYears) {
   return powerMonthlyPointQuery({
     parameters: CLIMATE_FACTORS.map((f) => CLIMATE_PARAMETERS[f]).sort(),
     longitude: lng,
     latitude: lat,
-    start: String(range.first),
+    start: String(range.first - 1),
     end: String(range.last + 1),
   });
 }

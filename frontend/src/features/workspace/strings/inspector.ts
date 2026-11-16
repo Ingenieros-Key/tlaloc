@@ -26,6 +26,19 @@ export const inspector = {
     humidity: (years: string) => `NASA POWER: average relative humidity at this plot, ${years}`,
     elevation: () => "NASA SRTM: mean height of the hexagons this plot covers",
   } satisfies Record<FactorId, (years: string) => string>,
+  /** The crop's score month by month across the climate years (rolling 12 months). */
+  monthly: {
+    title: "Month by month",
+    basis: "Each on its last 12 months",
+    readout: (month: string, score: string, season: string) => `${month}: ${score} · ${season}`,
+    noScore: "no score",
+    range: (low: string, lowMonth: string, high: string, highMonth: string) =>
+      `Lowest ${low} (${lowMonth}), highest ${high} (${highMonth})`,
+    chartLabel: (crop: string, low: string, high: string) =>
+      `${crop} score each month, on the 12 months before it. Lowest ${low}, highest ${high}.`,
+    legendLabel: "Monthly chart key",
+    thresholds: "Good 70 · Fair 45",
+  },
   /** The crop scored on each year behind the average. */
   byYear: "Each year",
   byYearLabel: (crop: string) => `${crop} score in each of the last years`,
